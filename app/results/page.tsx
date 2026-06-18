@@ -8,8 +8,7 @@ import Logo from "@/components/Logo";
 import {
   rankMatches,
   preferenceToFactor,
-  DESTINATION_CITY,
-  ORIGIN_CITY,
+  getCityPair,
   type ScoredMatch,
   type Preference,
 } from "@/lib/data";
@@ -43,24 +42,33 @@ function ResultsFallback() {
 function ResultsView() {
   const params = useSearchParams();
 
-  const from = params.get("from") || ORIGIN_CITY;
-  const to = params.get("to") || DESTINATION_CITY;
-  const neighborhood = params.get("neighborhood") || "Kirkwood";
+  // Resolve which supported city pair to show from the typed cities.
+  const pair = useMemo(
+    () => getCityPair(params.get("from"), params.get("to")),
+    [params]
+  );
+  const from = pair.origin;
+  const to = pair.destination;
+  const neighborhood =
+    params.get("neighborhood") || pair.matches[0].familiar;
 
   const metrics = useMemo<Preference[]>(() => {
     const raw = params.get("metrics");
     if (!raw) return [];
     return raw
       .split(",")
-      .map((pair) => {
-        const [name, importance] = pair.split(":");
+      .map((entry) => {
+        const [name, importance] = entry.split(":");
         return { name, importance: Number(importance) || 1 };
       })
       .filter((m) => m.name);
   }, [params]);
 
-  // Re-score and re-rank the matches against this user's weighted priorities.
-  const ranked = useMemo(() => rankMatches(metrics), [metrics]);
+  // Re-score and re-rank this pair's matches against the user's priorities.
+  const ranked = useMemo(
+    () => rankMatches(pair.matches, metrics),
+    [pair, metrics]
+  );
 
   // Which factors the user actually prioritized (for highlighting).
   const prioritizedFactors = useMemo(() => {
@@ -184,6 +192,8 @@ function ResultsView() {
               matches={ranked}
               selectedId={selectedId}
               topId={topId}
+              center={pair.center}
+              zoom={pair.zoom}
               onSelect={setSelectedId}
             />
           </div>

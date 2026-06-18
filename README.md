@@ -27,15 +27,17 @@ re-rank the matches (see `rankMatches` in `lib/data.ts`), and each match is
 plotted at its real Denver coordinates on the map. The map tiles load from a
 public CDN, so the map needs an internet connection to render.
 
-## Mock matches
+## Supported city pairs
 
-| You know (St. Louis) | Feels like (Denver) | Score |
-| -------------------- | ------------------- | ----- |
-| Kirkwood             | Wheat Ridge         | 87    |
-| Clayton              | Cherry Creek        | 84    |
-| Central West End     | LoDo                | 82    |
-| Webster Groves       | Littleton           | 79    |
-| Soulard              | RiNo                | 76    |
+The `/match` city fields are pickers, and the pair you choose drives a
+different set of matches and a different map. Three demo pairs ship in
+`lib/data.ts` (`cityPairs`):
+
+- **St. Louis, MO → Denver, CO** (e.g. Kirkwood → Wheat Ridge, 87)
+- **Chicago, IL → Austin, TX** (e.g. Wicker Park → East Austin, 86)
+- **San Francisco, CA → Seattle, WA** (e.g. The Mission → Capitol Hill, 85)
+
+Adding another pair is just another entry in the `cityPairs` array.
 
 ## Run it locally
 

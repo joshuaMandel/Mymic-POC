@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import { cityPairs } from "@/lib/data";
 
 type Metric = { name: string; importance: number };
 
@@ -16,9 +17,12 @@ const IMPORTANCE_LABELS: Record<number, string> = {
 export default function MatchPage() {
   const router = useRouter();
 
-  const [currentCity, setCurrentCity] = useState("St. Louis, MO");
-  const [destinationCity, setDestinationCity] = useState("Denver, CO");
-  const [currentNeighborhood, setCurrentNeighborhood] = useState("Kirkwood");
+  const [pairId, setPairId] = useState(cityPairs[0].id);
+  const pair = cityPairs.find((p) => p.id === pairId) ?? cityPairs[0];
+
+  const [currentNeighborhood, setCurrentNeighborhood] = useState(
+    cityPairs[0].matches[0].familiar
+  );
 
   const [metrics, setMetrics] = useState<Metric[]>([
     { name: "Nightlife", importance: 2 },
@@ -26,6 +30,13 @@ export default function MatchPage() {
     { name: "Schools", importance: 3 },
     { name: "Churches/Temples", importance: 2 },
   ]);
+
+  function selectPair(id: string) {
+    const next = cityPairs.find((p) => p.id === id) ?? cityPairs[0];
+    setPairId(next.id);
+    // The origin changed, so reset to a neighborhood that exists there.
+    setCurrentNeighborhood(next.matches[0].familiar);
+  }
 
   function updateMetric(index: number, patch: Partial<Metric>) {
     setMetrics((prev) =>
@@ -36,8 +47,8 @@ export default function MatchPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const params = new URLSearchParams({
-      from: currentCity,
-      to: destinationCity,
+      from: pair.origin,
+      to: pair.destination,
       neighborhood: currentNeighborhood,
       metrics: metrics
         .filter((m) => m.name.trim().length > 0)
@@ -66,38 +77,67 @@ export default function MatchPage() {
         <form onSubmit={handleSubmit} className="mt-8 space-y-8">
           {/* Relocation details */}
           <div className="card p-6 md:p-8">
-            <h2 className="text-lg font-bold text-brand-text">
-              Relocation details
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-brand-text">
+                Relocation details
+              </h2>
+              <span className="rounded-full bg-brand-purple/10 px-2.5 py-1 text-[11px] font-semibold text-brand-purple">
+                {cityPairs.length} demo cities
+              </span>
+            </div>
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
               <Field label="Current city">
-                <input
-                  required
-                  value={currentCity}
-                  onChange={(e) => setCurrentCity(e.target.value)}
-                  placeholder="e.g. St. Louis, MO"
+                <select
+                  value={pair.origin}
+                  onChange={(e) => {
+                    const p = cityPairs.find((x) => x.origin === e.target.value);
+                    if (p) selectPair(p.id);
+                  }}
                   className="input"
-                />
+                >
+                  {cityPairs.map((p) => (
+                    <option key={p.id} value={p.origin}>
+                      {p.origin}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="Destination city">
-                <input
-                  required
-                  value={destinationCity}
-                  onChange={(e) => setDestinationCity(e.target.value)}
-                  placeholder="e.g. Denver, CO"
+                <select
+                  value={pair.destination}
+                  onChange={(e) => {
+                    const p = cityPairs.find(
+                      (x) => x.destination === e.target.value
+                    );
+                    if (p) selectPair(p.id);
+                  }}
                   className="input"
-                />
+                >
+                  {cityPairs.map((p) => (
+                    <option key={p.id} value={p.destination}>
+                      {p.destination}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <div className="sm:col-span-2">
                 <Field label="Current neighborhood">
-                  <input
-                    required
+                  <select
                     value={currentNeighborhood}
                     onChange={(e) => setCurrentNeighborhood(e.target.value)}
-                    placeholder="e.g. Kirkwood"
                     className="input"
-                  />
+                  >
+                    {pair.matches.map((m) => (
+                      <option key={m.id} value={m.familiar}>
+                        {m.familiar}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
+                <p className="mt-2 text-xs text-brand-text/50">
+                  Pick the {pair.origin.split(",")[0]} neighborhood you know best —
+                  we&apos;ll find its match in {pair.destination.split(",")[0]}.
+                </p>
               </div>
             </div>
           </div>
@@ -154,7 +194,6 @@ export default function MatchPage() {
           </button>
         </form>
       </section>
-
     </main>
   );
 }

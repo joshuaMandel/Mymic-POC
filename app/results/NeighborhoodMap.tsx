@@ -10,6 +10,8 @@ type Props = {
   matches: ScoredMatch[];
   selectedId: string;
   topId: string;
+  center: { lat: number; lng: number };
+  zoom: number;
   onSelect: (id: string) => void;
 };
 
@@ -81,12 +83,14 @@ export default function NeighborhoodMap({
   matches,
   selectedId,
   topId,
+  center,
+  zoom,
   onSelect,
 }: Props) {
   return (
     <MapContainer
-      center={[39.7392, -104.9903]}
-      zoom={11}
+      center={[center.lat, center.lng]}
+      zoom={zoom}
       scrollWheelZoom
       className="h-full w-full"
       style={{ background: "#EAEEF3" }}
