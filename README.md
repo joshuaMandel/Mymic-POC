@@ -62,6 +62,24 @@ npm run start   # serve the production build
 npm run lint    # next lint
 ```
 
+## Visual QA (screenshots)
+
+`npm run shots` captures the landing, match, and results pages at desktop
+(1440×900) and mobile (390×844) widths and writes PNGs to `./screenshots`
+(git-ignored). Useful for reviewing the UI — including for an agent that can
+read the images.
+
+```bash
+# one-time: download the headless browser
+npx playwright install chromium
+
+# with the dev server running (npm run dev), in another terminal:
+npm run shots
+
+# or point it at any deploy:
+BASE_URL=https://mymic-poc.vercel.app npm run shots
+```
+
 ## Project structure
 
 ```

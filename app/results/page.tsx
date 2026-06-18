@@ -88,12 +88,12 @@ function ResultsView() {
 
   return (
     <main className="min-h-screen">
-      <header className="border-b border-brand-text/5 bg-white/70 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-white/40 bg-white/60 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <Logo />
           <Link
             href="/match"
-            className="rounded-lg border border-brand-text/10 px-4 py-2 text-sm font-semibold text-brand-text/70 transition-colors hover:border-brand-purple hover:text-brand-purple"
+            className="rounded-xl border border-white/60 bg-white/60 px-4 py-2 text-sm font-semibold text-brand-text/70 backdrop-blur transition-colors hover:border-brand-purple hover:text-brand-purple"
           >
             ← Edit search
           </Link>
@@ -102,7 +102,7 @@ function ResultsView() {
 
       <div className="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-[260px_1fr_340px]">
         {/* Left sidebar — inputs summary */}
-        <aside className="space-y-4">
+        <aside className="animate-fade-up space-y-4">
           <div className="card p-5">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-brand-text/40">
               Your move
@@ -164,7 +164,7 @@ function ResultsView() {
             </div>
           )}
 
-          <div className="rounded-2xl bg-brand-green/10 p-5">
+          <div className="overflow-hidden rounded-2xl border border-brand-green/20 bg-brand-green/10 p-5 backdrop-blur">
             <p className="text-sm font-semibold text-brand-text">
               {ranked.length} familiar matches
             </p>
@@ -176,8 +176,8 @@ function ResultsView() {
           </div>
         </aside>
 
-        {/* Center — stylized map */}
-        <section className="card relative overflow-hidden p-2">
+        {/* Center — real map */}
+        <section className="card relative animate-fade-up overflow-hidden p-2 [animation-delay:80ms]">
           <div className="flex items-center justify-between px-4 pt-3">
             <h2 className="text-sm font-bold text-brand-text">
               {to.split(",")[0]} · translated for you
@@ -200,7 +200,7 @@ function ResultsView() {
         </section>
 
         {/* Right — selected detail */}
-        <aside>
+        <aside className="animate-fade-up [animation-delay:160ms]">
           <DetailPanel
             match={selected}
             originCity={from}
@@ -232,8 +232,9 @@ function DetailPanel({
 
   return (
     <div className="card sticky top-6 overflow-hidden">
-      <div className="bg-brand-gradient p-6 text-white">
-        <div className="flex items-center justify-between">
+      <div className="relative overflow-hidden bg-brand-sheen bg-[length:200%_auto] p-6 text-white animate-gradient">
+        <div className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-white/25 blur-2xl" />
+        <div className="relative flex items-center justify-between">
           <p className="text-xs font-medium uppercase tracking-wide text-white/70">
             Feels like home
           </p>

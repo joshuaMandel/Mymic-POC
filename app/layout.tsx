@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import Aurora from "@/components/Aurora";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -21,7 +22,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="min-h-screen bg-brand-bg font-sans text-brand-text antialiased">
+      <body className="min-h-screen font-sans text-brand-text antialiased">
+        <Aurora />
         {children}
       </body>
     </html>

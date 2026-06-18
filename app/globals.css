@@ -7,6 +7,10 @@
   --foreground: #1f2937;
 }
 
+html {
+  background-color: var(--background);
+}
+
 html,
 body {
   max-width: 100vw;
@@ -14,27 +18,76 @@ body {
 }
 
 body {
-  background: var(--background);
+  /* transparent so the fixed aurora layer shows through */
+  background: transparent;
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
 }
 
 @layer components {
-  .btn-gradient {
-    @apply inline-flex items-center justify-center rounded-xl bg-brand-gradient px-6 py-3 font-semibold text-white shadow-soft transition-transform duration-150 hover:scale-[1.02] active:scale-[0.99];
+  /* Frosted glass surfaces */
+  .glass {
+    @apply rounded-2xl border border-white/50 bg-white/55 shadow-glass backdrop-blur-xl;
+  }
+
+  .glass-strong {
+    @apply rounded-2xl border border-white/60 bg-white/75 shadow-glass backdrop-blur-2xl;
   }
 
   .card {
-    @apply rounded-2xl bg-white shadow-card;
+    @apply rounded-2xl border border-white/60 bg-white/80 shadow-card backdrop-blur-md;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(120deg, #6c3cf0, #9b7bf5 45%, #2fbf71);
+  }
+
+  /* Gradient button with a hover sheen sweep */
+  .btn-gradient {
+    @apply relative inline-flex items-center justify-center overflow-hidden rounded-xl px-6 py-3 font-semibold text-white shadow-glow transition-transform duration-150;
+    background-image: linear-gradient(135deg, #7c4dff, #6c3cf0 45%, #4e2bbf);
+    background-size: 180% 180%;
+  }
+  .btn-gradient:hover {
+    @apply scale-[1.02];
+  }
+  .btn-gradient:active {
+    @apply scale-[0.99];
+  }
+  .btn-gradient::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 40%;
+    background: linear-gradient(
+      120deg,
+      transparent,
+      rgba(255, 255, 255, 0.5),
+      transparent
+    );
+    transform: translateX(-180%) skewX(-20deg);
+  }
+  .btn-gradient:hover::after {
+    animation: sheen 0.9s ease;
   }
 
   .input {
-    @apply w-full rounded-xl border border-brand-text/10 bg-white px-3.5 py-2.5 text-[0.95rem] text-brand-text outline-none transition;
+    @apply w-full rounded-xl border border-brand-text/10 bg-white/80 px-3.5 py-2.5 text-[0.95rem] text-brand-text outline-none backdrop-blur-sm transition;
   }
-
   .input:focus {
     @apply border-brand-purple;
-    box-shadow: 0 0 0 3px rgba(108, 60, 240, 0.15);
+    box-shadow: 0 0 0 3px rgba(108, 60, 240, 0.18);
+  }
+}
+
+@keyframes sheen {
+  0% {
+    transform: translateX(-180%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(320%) skewX(-20deg);
   }
 }
 
@@ -48,4 +101,15 @@ body {
 .mymik-marker {
   background: transparent;
   border: none;
+}
+
+/* Respect users who prefer less motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

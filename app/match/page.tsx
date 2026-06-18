@@ -62,21 +62,28 @@ export default function MatchPage() {
     <main className="min-h-screen">
       <header className="mx-auto flex max-w-3xl items-center justify-between px-6 py-6">
         <Logo />
-        <span className="text-sm font-medium text-brand-text/50">Step 1 of 1</span>
+        <span className="rounded-full border border-white/60 bg-white/60 px-3 py-1 text-xs font-medium text-brand-text/50 backdrop-blur">
+          Step 1 of 1
+        </span>
       </header>
 
       <section className="mx-auto max-w-3xl px-6 py-6 md:py-10">
-        <h1 className="text-3xl font-extrabold tracking-tight text-brand-text md:text-4xl">
-          Let&apos;s map your move
-        </h1>
-        <p className="mt-3 text-brand-text/60">
-          Tell us where you&apos;re coming from and what makes a neighborhood feel
-          like home.
-        </p>
+        <div className="animate-fade-up">
+          <h1 className="text-4xl font-extrabold tracking-tight text-brand-text md:text-5xl">
+            Let&apos;s map your{" "}
+            <span className="text-gradient bg-[length:200%_auto] animate-gradient">
+              move
+            </span>
+          </h1>
+          <p className="mt-3 text-brand-text/60">
+            Tell us where you&apos;re coming from and what makes a neighborhood feel
+            like home.
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-8">
+        <form onSubmit={handleSubmit} className="mt-8 space-y-7">
           {/* Relocation details */}
-          <div className="card p-6 md:p-8">
+          <div className="glass-strong animate-fade-up p-6 md:p-8 [animation-delay:80ms]">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-brand-text">
                 Relocation details
@@ -143,7 +150,7 @@ export default function MatchPage() {
           </div>
 
           {/* Preference metrics */}
-          <div className="card p-6 md:p-8">
+          <div className="glass-strong animate-fade-up p-6 md:p-8 [animation-delay:160ms]">
             <div className="flex items-end justify-between">
               <div>
                 <h2 className="text-lg font-bold text-brand-text">
@@ -162,20 +169,20 @@ export default function MatchPage() {
               {metrics.map((metric, i) => (
                 <div
                   key={i}
-                  className="flex flex-col gap-3 rounded-xl bg-brand-bg p-3 sm:flex-row sm:items-center"
+                  className="flex flex-col gap-3 rounded-2xl border border-white/50 bg-white/50 p-3 backdrop-blur sm:flex-row sm:items-center"
                 >
                   <input
                     value={metric.name}
                     onChange={(e) => updateMetric(i, { name: e.target.value })}
                     placeholder={`Metric ${i + 1}`}
-                    className="input flex-1 bg-white"
+                    className="input flex-1"
                   />
                   <select
                     value={metric.importance}
                     onChange={(e) =>
                       updateMetric(i, { importance: Number(e.target.value) })
                     }
-                    className="input w-full bg-white sm:w-44"
+                    className="input w-full sm:w-44"
                     aria-label={`Importance for ${metric.name || `metric ${i + 1}`}`}
                   >
                     {[1, 2, 3, 4].map((n) => (
@@ -189,7 +196,10 @@ export default function MatchPage() {
             </div>
           </div>
 
-          <button type="submit" className="btn-gradient w-full text-lg tracking-wide">
+          <button
+            type="submit"
+            className="btn-gradient w-full animate-fade-up py-4 text-lg tracking-wide [animation-delay:220ms]"
+          >
             MYMIK
           </button>
         </form>
