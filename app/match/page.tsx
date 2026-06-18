@@ -155,23 +155,6 @@ export default function MatchPage() {
         </form>
       </section>
 
-      <style>{`
-        .input {
-          width: 100%;
-          border-radius: 0.75rem;
-          border: 1px solid rgba(31, 41, 55, 0.12);
-          background: #fff;
-          padding: 0.7rem 0.9rem;
-          font-size: 0.95rem;
-          color: #1f2937;
-          outline: none;
-          transition: border-color 120ms, box-shadow 120ms;
-        }
-        .input:focus {
-          border-color: #6C3CF0;
-          box-shadow: 0 0 0 3px rgba(108, 60, 240, 0.15);
-        }
-      `}</style>
     </main>
   );
 }
