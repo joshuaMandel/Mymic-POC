@@ -10,6 +10,7 @@ destination city. The demo translates **St. Louis → Denver** using mock data.
 
 - **Next.js (App Router)** + **TypeScript**
 - **Tailwind CSS** for styling (brand palette baked into `tailwind.config.ts`)
+- **react-leaflet + OpenStreetMap/CARTO tiles** for a real interactive map (no API key)
 - **Mock data only** — no backend or external APIs
 
 ### Pages
@@ -18,10 +19,13 @@ destination city. The demo translates **St. Louis → Denver** using mock data.
 | ----------- | ----------------------------------------------------------------------- |
 | `/`         | Landing page — hero, how-it-works, and a sample `Kirkwood → Wheat Ridge` card |
 | `/match`    | Input form — current/destination city, neighborhood, and 4 weighted preference metrics |
-| `/results`  | Sidebar of inputs, a stylized "map" of neighborhood blobs, and a detail panel |
+| `/results`  | Sidebar of inputs, a real Leaflet map with labeled neighborhood pins, and a detail panel |
 
 The match form passes inputs to `/results` via URL query params, so the results
-page reflects what you typed. Neighborhood matches live in `lib/data.ts`.
+page reflects what you typed. The importance dials genuinely re-score and
+re-rank the matches (see `rankMatches` in `lib/data.ts`), and each match is
+plotted at its real Denver coordinates on the map. The map tiles load from a
+public CDN, so the map needs an internet connection to render.
 
 ## Mock matches
 

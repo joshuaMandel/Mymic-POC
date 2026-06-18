@@ -11,8 +11,8 @@ export type NeighborhoodMatch = {
   score: number; // out of 100
   explanation: string;
   factors: MatchFactor[];
-  /** position of the blob on the stylized map, in percentages */
-  position: { top: number; left: number };
+  /** real-world location of the destination neighborhood */
+  coords: { lat: number; lng: number };
   /** accent color for the blob/card */
   color: string;
 };
@@ -35,7 +35,7 @@ export const matches: NeighborhoodMatch[] = [
       { label: "Nightlife", value: 55 },
       { label: "Outdoors", value: 88 },
     ],
-    position: { top: 28, left: 22 },
+    coords: { lat: 39.7665, lng: -105.0772 },
     color: "#6C3CF0",
   },
   {
@@ -52,7 +52,7 @@ export const matches: NeighborhoodMatch[] = [
       { label: "Nightlife", value: 72 },
       { label: "Outdoors", value: 70 },
     ],
-    position: { top: 52, left: 38 },
+    coords: { lat: 39.7169, lng: -104.9525 },
     color: "#4E2BBF",
   },
   {
@@ -69,7 +69,7 @@ export const matches: NeighborhoodMatch[] = [
       { label: "Nightlife", value: 90 },
       { label: "Outdoors", value: 58 },
     ],
-    position: { top: 40, left: 60 },
+    coords: { lat: 39.7530, lng: -104.9986 },
     color: "#2FBF71",
   },
   {
@@ -86,7 +86,7 @@ export const matches: NeighborhoodMatch[] = [
       { label: "Nightlife", value: 48 },
       { label: "Outdoors", value: 80 },
     ],
-    position: { top: 70, left: 26 },
+    coords: { lat: 39.6133, lng: -105.0178 },
     color: "#9B7BF5",
   },
   {
@@ -103,7 +103,7 @@ export const matches: NeighborhoodMatch[] = [
       { label: "Nightlife", value: 94 },
       { label: "Outdoors", value: 62 },
     ],
-    position: { top: 66, left: 64 },
+    coords: { lat: 39.7686, lng: -104.9805 },
     color: "#F0A93C",
   },
 ];

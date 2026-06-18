@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
@@ -12,6 +13,16 @@ import {
   type ScoredMatch,
   type Preference,
 } from "@/lib/data";
+
+// Leaflet touches `window`, so load the map only in the browser.
+const NeighborhoodMap = dynamic(() => import("./NeighborhoodMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center text-sm text-brand-text/40">
+      Loading map…
+    </div>
+  ),
+});
 
 export default function ResultsPage() {
   return (
@@ -151,8 +162,8 @@ function ResultsView() {
             </p>
             <p className="mt-1 text-xs text-brand-text/60">
               {personalized
-                ? "Ranked and scored by your priorities. Tap a blob to see why."
-                : "Tap a blob on the map to see why it fits."}
+                ? "Ranked and scored by your priorities. Tap a pin to see why."
+                : "Tap a pin on the map to see why it fits."}
             </p>
           </div>
         </aside>
@@ -168,41 +179,13 @@ function ResultsView() {
             </span>
           </div>
 
-          <div className="relative mt-2 h-[440px] w-full overflow-hidden rounded-xl bg-[radial-gradient(circle_at_30%_20%,#EEF0FF,transparent_55%),radial-gradient(circle_at_75%_75%,#E6F7EE,transparent_50%)]">
-            {/* faux map grid */}
-            <div
-              className="absolute inset-0 opacity-[0.5]"
-              style={{
-                backgroundImage:
-                  "linear-gradient(rgba(31,41,55,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(31,41,55,0.05) 1px, transparent 1px)",
-                backgroundSize: "44px 44px",
-              }}
+          <div className="relative mt-2 h-[440px] w-full overflow-hidden rounded-xl">
+            <NeighborhoodMap
+              matches={ranked}
+              selectedId={selectedId}
+              topId={topId}
+              onSelect={setSelectedId}
             />
-            {/* faux river */}
-            <svg
-              className="absolute inset-0 h-full w-full"
-              preserveAspectRatio="none"
-              viewBox="0 0 100 100"
-            >
-              <path
-                d="M-5,35 C20,45 30,20 50,30 C70,40 80,70 105,60"
-                fill="none"
-                stroke="#BFD4F2"
-                strokeWidth="3"
-                strokeLinecap="round"
-                opacity="0.6"
-              />
-            </svg>
-
-            {ranked.map((m) => (
-              <Blob
-                key={m.id}
-                match={m}
-                active={m.id === selectedId}
-                isTop={m.id === topId}
-                onSelect={() => setSelectedId(m.id)}
-              />
-            ))}
           </div>
         </section>
 
@@ -218,53 +201,6 @@ function ResultsView() {
         </aside>
       </div>
     </main>
-  );
-}
-
-function Blob({
-  match,
-  active,
-  isTop,
-  onSelect,
-}: {
-  match: ScoredMatch;
-  active: boolean;
-  isTop: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      onClick={onSelect}
-      style={{ top: `${match.position.top}%`, left: `${match.position.left}%` }}
-      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-2xl px-4 py-3 text-left shadow-card transition-all duration-200 ${
-        active ? "z-20 scale-110 ring-2 ring-offset-2" : "z-10 hover:scale-105"
-      }`}
-    >
-      <span
-        className="absolute inset-0 rounded-2xl opacity-90"
-        style={{ background: active ? match.color : `${match.color}E6` }}
-      />
-      <span
-        className="absolute inset-0 rounded-2xl ring-2"
-        style={{ boxShadow: active ? `0 0 0 2px ${match.color}` : undefined }}
-      />
-      <span className="relative block">
-        {isTop && (
-          <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand-purple">
-            ★ Top match
-          </span>
-        )}
-        <span className="block text-xs font-medium text-white/70">
-          {match.actual}
-        </span>
-        <span className="block text-sm font-bold text-white">
-          {match.familiar}
-        </span>
-        <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold text-white">
-          {match.personalizedScore}
-        </span>
-      </span>
-    </button>
   );
 }
 
