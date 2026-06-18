@@ -24,20 +24,21 @@ function markerIcon(match: ScoredMatch, active: boolean, isTop: boolean) {
     html: `
       <div style="transform: translate(-50%, -100%); text-align: center; cursor: pointer;">
         <div style="
-          display: inline-flex; align-items: center; gap: 6px;
+          display: inline-flex; align-items: center; gap: 5px;
           background: ${bg}; color: #fff; border-radius: 9999px;
-          padding: 6px 10px; white-space: nowrap;
+          padding: 4px 8px; white-space: nowrap;
           font-family: Inter, system-ui, sans-serif;
           border: 2px solid ${active ? "#ffffff" : "transparent"};
-          box-shadow: 0 6px 16px rgba(31,41,55,${active ? "0.45" : "0.3"});
-          transform: scale(${active ? 1.08 : 1}); transform-origin: bottom center;
+          box-shadow: 0 6px 16px rgba(31,41,55,${active ? "0.5" : "0.28"});
+          opacity: ${active || isTop ? 1 : 0.9};
+          transform: scale(${active ? 1.12 : 1}); transform-origin: bottom center;
           transition: transform 120ms ease;
         ">
-          ${isTop ? '<span style="font-size:12px;">★</span>' : ""}
-          <span style="font-weight:700; font-size:13px; line-height:1;">${match.familiar}</span>
+          ${isTop ? '<span style="font-size:11px;">★</span>' : ""}
+          <span style="font-weight:700; font-size:12px; line-height:1;">${match.familiar}</span>
           <span style="
             background: rgba(255,255,255,0.28); border-radius:9999px;
-            padding:2px 6px; font-size:11px; font-weight:700; line-height:1;
+            padding:2px 5px; font-size:10px; font-weight:700; line-height:1;
           ">${match.personalizedScore}</span>
         </div>
         <div style="

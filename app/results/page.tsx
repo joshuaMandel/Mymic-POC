@@ -177,7 +177,7 @@ function ResultsView() {
         </aside>
 
         {/* Center — real map */}
-        <section className="card relative animate-fade-up overflow-hidden p-2 [animation-delay:80ms]">
+        <section className="card relative flex flex-col animate-fade-up overflow-hidden p-2 [animation-delay:80ms]">
           <div className="flex items-center justify-between px-4 pt-3">
             <h2 className="text-sm font-bold text-brand-text">
               {to.split(",")[0]} · translated for you
@@ -187,7 +187,7 @@ function ResultsView() {
             </span>
           </div>
 
-          <div className="relative mt-2 h-[440px] w-full overflow-hidden rounded-xl">
+          <div className="relative mt-2 min-h-[440px] w-full flex-1 overflow-hidden rounded-xl">
             <NeighborhoodMap
               matches={ranked}
               selectedId={selectedId}
