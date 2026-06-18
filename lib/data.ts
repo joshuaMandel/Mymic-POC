@@ -11,8 +11,8 @@ export type NeighborhoodMatch = {
   score: number; // out of 100
   explanation: string;
   factors: MatchFactor[];
-  /** position of the blob on the stylized map, in percentages */
-  position: { top: number; left: number };
+  /** real-world location of the destination neighborhood */
+  coords: { lat: number; lng: number };
   /** accent color for the blob/card */
   color: string;
 };
@@ -35,7 +35,7 @@ export const matches: NeighborhoodMatch[] = [
       { label: "Nightlife", value: 55 },
       { label: "Outdoors", value: 88 },
     ],
-    position: { top: 28, left: 22 },
+    coords: { lat: 39.7665, lng: -105.0772 },
     color: "#6C3CF0",
   },
   {
@@ -52,7 +52,7 @@ export const matches: NeighborhoodMatch[] = [
       { label: "Nightlife", value: 72 },
       { label: "Outdoors", value: 70 },
     ],
-    position: { top: 52, left: 38 },
+    coords: { lat: 39.7169, lng: -104.9525 },
     color: "#4E2BBF",
   },
   {
@@ -69,7 +69,7 @@ export const matches: NeighborhoodMatch[] = [
       { label: "Nightlife", value: 90 },
       { label: "Outdoors", value: 58 },
     ],
-    position: { top: 40, left: 60 },
+    coords: { lat: 39.7530, lng: -104.9986 },
     color: "#2FBF71",
   },
   {
@@ -86,7 +86,7 @@ export const matches: NeighborhoodMatch[] = [
       { label: "Nightlife", value: 48 },
       { label: "Outdoors", value: 80 },
     ],
-    position: { top: 70, left: 26 },
+    coords: { lat: 39.6133, lng: -105.0178 },
     color: "#9B7BF5",
   },
   {
@@ -103,7 +103,80 @@ export const matches: NeighborhoodMatch[] = [
       { label: "Nightlife", value: 94 },
       { label: "Outdoors", value: 62 },
     ],
-    position: { top: 66, left: 64 },
+    coords: { lat: 39.7686, lng: -104.9805 },
     color: "#F0A93C",
   },
 ];
+
+// --- Personalized scoring ------------------------------------------------
+
+export type Preference = { name: string; importance: number };
+
+export type ScoredMatch = NeighborhoodMatch & {
+  /** score recomputed from this user's weighted priorities (0-100) */
+  personalizedScore: number;
+  /** whether the user's priorities actually influenced the score */
+  personalized: boolean;
+};
+
+// The factors we have data for, and the words a user might type to mean each.
+const FACTOR_KEYWORDS: Record<string, string[]> = {
+  Walkability: ["walk", "transit", "transport", "commute", "bike"],
+  Amenities: ["amenit", "shop", "dining", "restaurant", "food", "grocery", "cafe", "coffee"],
+  Schools: ["school", "education", "kids", "famil"],
+  Nightlife: ["nightlife", "bar", "club", "music", "drink", "live"],
+  Outdoors: ["outdoor", "nature", "park", "hike", "trail", "green", "mountain"],
+};
+
+/** Map a free-text preference name to one of our known factors, or null. */
+export function preferenceToFactor(name: string): string | null {
+  const n = name.trim().toLowerCase();
+  if (!n) return null;
+  // exact label match first (e.g. "Schools" -> Schools)
+  for (const factor of Object.keys(FACTOR_KEYWORDS)) {
+    if (factor.toLowerCase() === n) return factor;
+  }
+  // otherwise keyword/substring match (e.g. "Hiking" -> Outdoors)
+  for (const [factor, keywords] of Object.entries(FACTOR_KEYWORDS)) {
+    if (keywords.some((k) => n.includes(k))) return factor;
+  }
+  return null;
+}
+
+/**
+ * Re-score every match against the user's weighted priorities and return them
+ * sorted best-first. A neighborhood's personalized score is the weighted
+ * average of its factor values, using each priority's importance (1-4) as the
+ * weight. If no priorities map to known factors, the curated base score is used.
+ */
+export function rankMatches(preferences: Preference[]): ScoredMatch[] {
+  const weights = new Map<string, number>();
+  for (const p of preferences) {
+    const factor = preferenceToFactor(p.name);
+    if (factor && p.importance > 0) {
+      weights.set(factor, (weights.get(factor) ?? 0) + p.importance);
+    }
+  }
+
+  const hasWeights = weights.size > 0;
+
+  const scored: ScoredMatch[] = matches.map((m) => {
+    if (!hasWeights) {
+      return { ...m, personalizedScore: m.score, personalized: false };
+    }
+    let weightedSum = 0;
+    let totalWeight = 0;
+    for (const f of m.factors) {
+      const w = weights.get(f.label);
+      if (w) {
+        weightedSum += f.value * w;
+        totalWeight += w;
+      }
+    }
+    const personalizedScore =
+      totalWeight > 0 ? Math.round(weightedSum / totalWeight) : m.score;
+    return { ...m, personalizedScore, personalized: true };
+  });
+
+  return scored.sort((a, b) => b.personalizedScore - a.personalizedScore);
+}

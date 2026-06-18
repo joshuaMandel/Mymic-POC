@@ -27,4 +27,25 @@ body {
   .card {
     @apply rounded-2xl bg-white shadow-card;
   }
+
+  .input {
+    @apply w-full rounded-xl border border-brand-text/10 bg-white px-3.5 py-2.5 text-[0.95rem] text-brand-text outline-none transition;
+  }
+
+  .input:focus {
+    @apply border-brand-purple;
+    box-shadow: 0 0 0 3px rgba(108, 60, 240, 0.15);
+  }
+}
+
+/* Leaflet map tweaks */
+.leaflet-container {
+  font-family: inherit;
+  background: #eaeef3;
+}
+
+/* Custom HTML markers — drop Leaflet's default white box */
+.mymik-marker {
+  background: transparent;
+  border: none;
 }

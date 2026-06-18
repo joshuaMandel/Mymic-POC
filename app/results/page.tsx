@@ -1,15 +1,28 @@
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import {
-  matches,
+  rankMatches,
+  preferenceToFactor,
   DESTINATION_CITY,
   ORIGIN_CITY,
-  type NeighborhoodMatch,
+  type ScoredMatch,
+  type Preference,
 } from "@/lib/data";
+
+// Leaflet touches `window`, so load the map only in the browser.
+const NeighborhoodMap = dynamic(() => import("./NeighborhoodMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center text-sm text-brand-text/40">
+      Loading map…
+    </div>
+  ),
+});
 
 export default function ResultsPage() {
   return (
@@ -34,9 +47,9 @@ function ResultsView() {
   const to = params.get("to") || DESTINATION_CITY;
   const neighborhood = params.get("neighborhood") || "Kirkwood";
 
-  const metrics = useMemo(() => {
+  const metrics = useMemo<Preference[]>(() => {
     const raw = params.get("metrics");
-    if (!raw) return [] as { name: string; importance: number }[];
+    if (!raw) return [];
     return raw
       .split(",")
       .map((pair) => {
@@ -46,9 +59,24 @@ function ResultsView() {
       .filter((m) => m.name);
   }, [params]);
 
-  const [selectedId, setSelectedId] = useState(matches[0].id);
-  const selected =
-    matches.find((m) => m.id === selectedId) ?? matches[0];
+  // Re-score and re-rank the matches against this user's weighted priorities.
+  const ranked = useMemo(() => rankMatches(metrics), [metrics]);
+
+  // Which factors the user actually prioritized (for highlighting).
+  const prioritizedFactors = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of metrics) {
+      const f = preferenceToFactor(m.name);
+      if (f) set.add(f);
+    }
+    return set;
+  }, [metrics]);
+
+  const personalized = ranked.some((m) => m.personalized);
+
+  const [selectedId, setSelectedId] = useState(ranked[0].id);
+  const selected = ranked.find((m) => m.id === selectedId) ?? ranked[0];
+  const topId = ranked[0].id;
 
   return (
     <main className="min-h-screen">
@@ -93,32 +121,49 @@ function ResultsView() {
                 Priorities
               </h2>
               <ul className="mt-4 space-y-3">
-                {metrics.map((m, i) => (
-                  <li key={i}>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-brand-text">{m.name}</span>
-                      <span className="text-xs font-semibold text-brand-text/50">
-                        {m.importance}/4
-                      </span>
-                    </div>
-                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-brand-bg">
-                      <div
-                        className="h-full rounded-full bg-brand-gradient"
-                        style={{ width: `${(m.importance / 4) * 100}%` }}
-                      />
-                    </div>
-                  </li>
-                ))}
+                {metrics.map((m, i) => {
+                  const scored = preferenceToFactor(m.name) !== null;
+                  return (
+                    <li key={i}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="flex items-center gap-1.5 font-medium text-brand-text">
+                          {m.name}
+                          {!scored && (
+                            <span
+                              title="No neighborhood data for this yet — it won't affect scores."
+                              className="rounded bg-brand-text/5 px-1.5 py-0.5 text-[10px] font-semibold text-brand-text/40"
+                            >
+                              no data
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-xs font-semibold text-brand-text/50">
+                          {m.importance}/4
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full rounded-full bg-brand-bg">
+                        <div
+                          className={`h-full rounded-full ${
+                            scored ? "bg-brand-gradient" : "bg-brand-text/15"
+                          }`}
+                          style={{ width: `${(m.importance / 4) * 100}%` }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
 
           <div className="rounded-2xl bg-brand-green/10 p-5">
             <p className="text-sm font-semibold text-brand-text">
-              {matches.length} familiar matches
+              {ranked.length} familiar matches
             </p>
             <p className="mt-1 text-xs text-brand-text/60">
-              Tap a blob on the map to see why it fits.
+              {personalized
+                ? "Ranked and scored by your priorities. Tap a pin to see why."
+                : "Tap a pin on the map to see why it fits."}
             </p>
           </div>
         </aside>
@@ -134,95 +179,28 @@ function ResultsView() {
             </span>
           </div>
 
-          <div className="relative mt-2 h-[440px] w-full overflow-hidden rounded-xl bg-[radial-gradient(circle_at_30%_20%,#EEF0FF,transparent_55%),radial-gradient(circle_at_75%_75%,#E6F7EE,transparent_50%)]">
-            {/* faux map grid */}
-            <div
-              className="absolute inset-0 opacity-[0.5]"
-              style={{
-                backgroundImage:
-                  "linear-gradient(rgba(31,41,55,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(31,41,55,0.05) 1px, transparent 1px)",
-                backgroundSize: "44px 44px",
-              }}
+          <div className="relative mt-2 h-[440px] w-full overflow-hidden rounded-xl">
+            <NeighborhoodMap
+              matches={ranked}
+              selectedId={selectedId}
+              topId={topId}
+              onSelect={setSelectedId}
             />
-            {/* faux river */}
-            <svg
-              className="absolute inset-0 h-full w-full"
-              preserveAspectRatio="none"
-              viewBox="0 0 100 100"
-            >
-              <path
-                d="M-5,35 C20,45 30,20 50,30 C70,40 80,70 105,60"
-                fill="none"
-                stroke="#BFD4F2"
-                strokeWidth="3"
-                strokeLinecap="round"
-                opacity="0.6"
-              />
-            </svg>
-
-            {matches.map((m) => (
-              <Blob
-                key={m.id}
-                match={m}
-                active={m.id === selectedId}
-                onSelect={() => setSelectedId(m.id)}
-              />
-            ))}
           </div>
         </section>
 
         {/* Right — selected detail */}
         <aside>
-          <DetailPanel match={selected} originCity={from} destCity={to} />
+          <DetailPanel
+            match={selected}
+            originCity={from}
+            destCity={to}
+            isTop={selected.id === topId}
+            prioritizedFactors={prioritizedFactors}
+          />
         </aside>
       </div>
     </main>
-  );
-}
-
-function Blob({
-  match,
-  active,
-  onSelect,
-}: {
-  match: NeighborhoodMatch;
-  active: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      onClick={onSelect}
-      style={{ top: `${match.position.top}%`, left: `${match.position.left}%` }}
-      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-2xl px-4 py-3 text-left shadow-card transition-all duration-200 ${
-        active
-          ? "z-20 scale-110 ring-2 ring-offset-2"
-          : "z-10 hover:scale-105"
-      }`}
-    >
-      <span
-        className="absolute inset-0 rounded-2xl opacity-90"
-        style={{
-          background: active
-            ? match.color
-            : `${match.color}E6`,
-        }}
-      />
-      <span
-        className="absolute inset-0 rounded-2xl ring-2"
-        style={{ boxShadow: active ? `0 0 0 2px ${match.color}` : undefined }}
-      />
-      <span className="relative block">
-        <span className="block text-xs font-medium text-white/70">
-          {match.actual}
-        </span>
-        <span className="block text-sm font-bold text-white">
-          {match.familiar}
-        </span>
-        <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold text-white">
-          {match.score}
-        </span>
-      </span>
-    </button>
   );
 }
 
@@ -230,17 +208,31 @@ function DetailPanel({
   match,
   originCity,
   destCity,
+  isTop,
+  prioritizedFactors,
 }: {
-  match: NeighborhoodMatch;
+  match: ScoredMatch;
   originCity: string;
   destCity: string;
+  isTop: boolean;
+  prioritizedFactors: Set<string>;
 }) {
+  const showBaseline =
+    match.personalized && match.personalizedScore !== match.score;
+
   return (
     <div className="card sticky top-6 overflow-hidden">
       <div className="bg-brand-gradient p-6 text-white">
-        <p className="text-xs font-medium uppercase tracking-wide text-white/70">
-          Feels like home
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium uppercase tracking-wide text-white/70">
+            Feels like home
+          </p>
+          {isTop && (
+            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+              ★ Top match
+            </span>
+          )}
+        </div>
         <div className="mt-2 flex items-baseline gap-2">
           <h3 className="text-2xl font-extrabold">{match.familiar}</h3>
           <span className="text-sm text-white/70">
@@ -254,12 +246,19 @@ function DetailPanel({
         </div>
 
         <div className="mt-5 flex items-center justify-between rounded-xl bg-white/15 px-4 py-3">
-          <span className="text-sm font-semibold">Match score</span>
+          <span className="text-sm font-semibold">
+            {match.personalized ? "Your match score" : "Match score"}
+          </span>
           <span className="text-2xl font-extrabold">
-            {match.score}
+            {match.personalizedScore}
             <span className="text-sm font-semibold text-white/60">/100</span>
           </span>
         </div>
+        {showBaseline && (
+          <p className="mt-2 text-center text-xs text-white/70">
+            Overall similarity {match.score}/100 · re-scored for your priorities
+          </p>
+        )}
       </div>
 
       <div className="p-6">
@@ -274,30 +273,44 @@ function DetailPanel({
           Matching factors
         </h4>
         <ul className="mt-3 space-y-3">
-          {match.factors.map((f) => (
-            <li key={f.label}>
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-brand-text">{f.label}</span>
-                <span className="text-xs font-semibold text-brand-text/50">
-                  {f.value}
-                </span>
-              </div>
-              <div className="mt-1.5 h-2 w-full rounded-full bg-brand-bg">
+          {match.factors.map((f) => {
+            const prioritized = prioritizedFactors.has(f.label);
+            return (
+              <li key={f.label}>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1.5 font-medium text-brand-text">
+                    {f.label}
+                    {prioritized && (
+                      <span className="rounded bg-brand-purple/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand-purple">
+                        Priority
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs font-semibold text-brand-text/50">
+                    {f.value}
+                  </span>
+                </div>
                 <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${f.value}%`,
-                    background:
-                      f.value >= 80
-                        ? "#2FBF71"
-                        : f.value >= 65
-                          ? "#6C3CF0"
-                          : "#9B7BF5",
-                  }}
-                />
-              </div>
-            </li>
-          ))}
+                  className={`mt-1.5 h-2 w-full rounded-full bg-brand-bg ${
+                    prioritized ? "ring-1 ring-brand-purple/30" : ""
+                  }`}
+                >
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${f.value}%`,
+                      background:
+                        f.value >= 80
+                          ? "#2FBF71"
+                          : f.value >= 65
+                            ? "#6C3CF0"
+                            : "#9B7BF5",
+                    }}
+                  />
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>
