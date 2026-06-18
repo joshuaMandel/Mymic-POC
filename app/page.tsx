@@ -32,19 +32,19 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-14 md:grid-cols-2 md:py-24">
+      <section className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-14 md:grid-cols-2 md:py-20">
         <div className="animate-fade-up">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/60 px-3 py-1 text-xs font-semibold text-brand-green shadow-sm backdrop-blur">
             <span className="h-2 w-2 animate-pulse rounded-full bg-brand-green" />
             Relocation, decoded
           </span>
-          <h1 className="mt-6 text-5xl font-extrabold leading-[1.05] tracking-tight text-brand-text sm:text-6xl">
+          <h1 className="mt-6 text-balance text-5xl font-extrabold leading-[1.05] tracking-tight text-brand-text sm:text-6xl">
             Find where your life fits in a{" "}
             <span className="text-gradient bg-[length:200%_auto] animate-gradient">
               new city
             </span>
           </h1>
-          <p className="mt-6 max-w-md text-lg text-brand-text/70">
+          <p className="mt-6 max-w-md text-pretty text-lg text-brand-text/70">
             MyMik translates the neighborhoods you know into the city you&apos;re
             moving to — familiar names, on an unfamiliar map.
           </p>
