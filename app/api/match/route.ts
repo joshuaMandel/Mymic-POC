@@ -12,6 +12,16 @@ type Body = {
   preferences?: unknown;
 };
 
+// Health check — visit /api/match in a browser to confirm the deployment can
+// see the key. Returns a boolean only; never the key itself.
+export async function GET() {
+  return Response.json({
+    ok: true,
+    keyPresent: Boolean(process.env.ANTHROPIC_API_KEY),
+    model: "claude-haiku-4-5",
+  });
+}
+
 function parsePreferences(input: unknown): Preference[] {
   if (!Array.isArray(input)) return [];
   return input
@@ -46,9 +56,11 @@ export async function POST(req: Request) {
 
   let matches = ranked;
   let aiGenerated = false;
+  const keyPresent = Boolean(process.env.ANTHROPIC_API_KEY);
+  let aiError: string | undefined;
 
   // Only reach for Claude when a key is configured; otherwise keep templated copy.
-  if (process.env.ANTHROPIC_API_KEY) {
+  if (keyPresent) {
     try {
       const explanations = await generateExplanations(pair, ranked, neighborhood);
       matches = ranked.map((m) => ({
@@ -58,6 +70,11 @@ export async function POST(req: Request) {
       aiGenerated = true;
     } catch (err) {
       console.error("[/api/match] AI explanation generation failed:", err);
+      // Non-secret error summary for diagnostics (Anthropic errors don't contain the key).
+      aiError =
+        err instanceof Error
+          ? `${err.name}: ${err.message}`.slice(0, 300)
+          : String(err).slice(0, 300);
     }
   }
 
@@ -69,5 +86,7 @@ export async function POST(req: Request) {
     zoom: pair.zoom,
     matches,
     aiGenerated,
+    keyPresent,
+    aiError,
   });
 }
