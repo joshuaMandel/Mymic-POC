@@ -8,11 +8,11 @@
       "lng": -86.789146
     },
     "attrs": {
-      "Walkability": 100,
-      "Amenities": 100,
+      "Walkability": 0,
+      "Amenities": 0,
       "Schools": 94,
-      "Nightlife": 100,
-      "Outdoors": 100
+      "Nightlife": 0,
+      "Outdoors": 0
     }
   },
   {
@@ -24,11 +24,27 @@
       "lng": -86.731083
     },
     "attrs": {
-      "Walkability": 13,
-      "Amenities": 9,
+      "Walkability": 35,
+      "Amenities": 22,
       "Schools": 81,
-      "Nightlife": 9,
-      "Outdoors": 33
+      "Nightlife": 80,
+      "Outdoors": 61
+    }
+  },
+  {
+    "id": "zcta-37212",
+    "city": "Nashville, TN",
+    "name": "ZIP 37212",
+    "coords": {
+      "lat": 36.133773,
+      "lng": -86.801688
+    },
+    "attrs": {
+      "Walkability": 100,
+      "Amenities": 100,
+      "Schools": 97,
+      "Nightlife": 100,
+      "Outdoors": 100
     }
   },
   {
@@ -40,11 +56,11 @@
       "lng": -86.834904
     },
     "attrs": {
-      "Walkability": 0,
+      "Walkability": 7,
       "Amenities": 0,
       "Schools": 100,
       "Nightlife": 0,
-      "Outdoors": 0
+      "Outdoors": 25
     }
   },
   {
@@ -56,11 +72,75 @@
       "lng": -86.777342
     },
     "attrs": {
-      "Walkability": 2,
+      "Walkability": 12,
       "Amenities": 0,
       "Schools": 0,
       "Nightlife": 0,
-      "Outdoors": 16
+      "Outdoors": 43
+    }
+  },
+  {
+    "id": "zcta-37209",
+    "city": "Nashville, TN",
+    "name": "ZIP 37209",
+    "coords": {
+      "lat": 36.150656,
+      "lng": -86.959839
+    },
+    "attrs": {
+      "Walkability": 9,
+      "Amenities": 0,
+      "Schools": 54,
+      "Nightlife": 0,
+      "Outdoors": 32
+    }
+  },
+  {
+    "id": "zcta-37211",
+    "city": "Nashville, TN",
+    "name": "ZIP 37211",
+    "coords": {
+      "lat": 36.067017,
+      "lng": -86.723419
+    },
+    "attrs": {
+      "Walkability": 0,
+      "Amenities": 0,
+      "Schools": 37,
+      "Nightlife": 0,
+      "Outdoors": 0
+    }
+  },
+  {
+    "id": "zcta-97201",
+    "city": "Portland, OR",
+    "name": "ZIP 97201",
+    "coords": {
+      "lat": 45.508551,
+      "lng": -122.688283
+    },
+    "attrs": {
+      "Walkability": 68,
+      "Amenities": 53,
+      "Schools": 0,
+      "Nightlife": 27,
+      "Outdoors": 100
+    }
+  },
+  {
+    "id": "zcta-97202",
+    "city": "Portland, OR",
+    "name": "ZIP 97202",
+    "coords": {
+      "lat": 45.482012,
+      "lng": -122.644451
+    },
+    "attrs": {
+      "Walkability": 0,
+      "Amenities": 0,
+      "Schools": 3,
+      "Nightlife": 0,
+      "Outdoors": 0
     }
   },
   {
@@ -72,11 +152,75 @@
       "lng": -122.683951
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
-      "Schools": 50,
-      "Nightlife": 50,
-      "Outdoors": 50
+      "Walkability": 100,
+      "Amenities": 100,
+      "Schools": 19,
+      "Nightlife": 100,
+      "Outdoors": 31
+    }
+  },
+  {
+    "id": "zcta-97210",
+    "city": "Portland, OR",
+    "name": "ZIP 97210",
+    "coords": {
+      "lat": 45.545484,
+      "lng": -122.736853
+    },
+    "attrs": {
+      "Walkability": 3,
+      "Amenities": 1,
+      "Schools": 23,
+      "Nightlife": 0,
+      "Outdoors": 13
+    }
+  },
+  {
+    "id": "zcta-97214",
+    "city": "Portland, OR",
+    "name": "ZIP 97214",
+    "coords": {
+      "lat": 45.513962,
+      "lng": -122.644031
+    },
+    "attrs": {
+      "Walkability": 72,
+      "Amenities": 73,
+      "Schools": 100,
+      "Nightlife": 93,
+      "Outdoors": 8
+    }
+  },
+  {
+    "id": "zcta-97217",
+    "city": "Portland, OR",
+    "name": "ZIP 97217",
+    "coords": {
+      "lat": 45.596784,
+      "lng": -122.695414
+    },
+    "attrs": {
+      "Walkability": 0,
+      "Amenities": 0,
+      "Schools": 44,
+      "Nightlife": 0,
+      "Outdoors": 0
+    }
+  },
+  {
+    "id": "zcta-97213",
+    "city": "Portland, OR",
+    "name": "ZIP 97213",
+    "coords": {
+      "lat": 45.538194,
+      "lng": -122.600014
+    },
+    "attrs": {
+      "Walkability": 20,
+      "Amenities": 20,
+      "Schools": 16,
+      "Nightlife": 16,
+      "Outdoors": 11
     }
   }
 ]
