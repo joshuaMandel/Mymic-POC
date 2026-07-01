@@ -58,12 +58,18 @@ export CENSUS_API_KEY=xxxx
 node scripts/build-neighborhoods.mjs   # → data/neighborhoods.generated.json
 ```
 
-The script is an honest **starter**: ACS supplies demographics/cost/education
-directly; walkability, amenities, nightlife, and outdoors are approximated and
-marked `TODO` in `toFactors()` — the one place to plug in richer free sources (EPA
-National Walkability Index, OpenStreetMap POI counts, NCES school data). Merge the
-generated JSON into `lib/neighborhoods.ts` to use it. See the file header for the
-full pipeline and limits.
+All sources are **free**. Real signals per ZIP:
+
+- **Amenities / Nightlife / Outdoors** → live **OpenStreetMap POI counts** (shops &
+  restaurants / bars & clubs / parks & green space) within ~1 mile, via the Overpass API.
+- **Walkability** → total POI density (proxy; EPA National Walkability Index is the
+  gold-standard `TODO`).
+- **Schools** → Census ACS education share (proxy; NCES/GreatSchools is the `TODO`).
+
+Each metric is normalized within its metro, then written in the `Neighborhood` shape.
+Remaining `TODO`s (EPA walkability, real school ratings, a neighborhood-name gazetteer)
+are marked in the script. Merge the generated JSON into `lib/neighborhoods.ts` to use it.
+Overpass is rate-limited, so the script is paced — run a handful of metros at a time.
 
 ## Backend API
 

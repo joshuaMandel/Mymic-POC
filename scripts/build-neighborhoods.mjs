@@ -1,37 +1,33 @@
 /**
- * build-neighborhoods.mjs — ingest real US Census (ACS) data into the MyMik
- * neighborhood schema, so the matching engine can cover real cities.
+ * build-neighborhoods.mjs — ingest real US data into the MyMik neighborhood
+ * schema so the matching engine can cover real cities. All sources are FREE.
  *
- * WHAT THIS DOES (MVP / free data only):
- *   - Reads scripts/metros.json: [{ "city": "St. Louis, MO", "zips": [...] }]
- *   - For each ZIP (ZCTA), fetches ACS 5-year attributes from the Census API
- *   - Fetches ZCTA centroids from the Census gazetteer (for map coordinates)
- *   - Normalizes each metric to 0-100 WITHIN its metro (so "walkable for Denver"
- *     is comparable to "walkable for Chicago")
- *   - Maps them onto MyMik's 5 factors and writes data/neighborhoods.generated.json
- *     in the exact shape of lib/neighborhoods.ts `Neighborhood[]`.
+ * DATA SOURCES (per ZIP/ZCTA):
+ *   - OpenStreetMap via the Overpass API → real POI counts within ~1 mile:
+ *       • Amenities  = shops + restaurants/cafes/groceries/pharmacies/banks
+ *       • Nightlife  = bars + pubs + nightclubs
+ *       • Outdoors   = parks + gardens + nature reserves + natural features
+ *       • Walkability = total POI density (proxy; EPA index is the gold standard)
+ *   - US Census ACS 5-year → Schools proxy (share of adults with a bachelor's+).
+ *   Each metric is normalized to 0-100 WITHIN its metro so cities are comparable,
+ *   then written to data/neighborhoods.generated.json in the exact shape of
+ *   lib/neighborhoods.ts `Neighborhood[]`.
  *
- * HONEST LIMITS (documented on purpose):
- *   - ACS gives demographics/cost/education directly. It does NOT give
- *     walkability, amenities, nightlife, or outdoors. Those are approximated
- *     here from density/income/age as a *starter*. For production quality, layer:
- *       • Walkability  → EPA National Walkability Index (per block group, free)
- *       • Amenities/Nightlife/Outdoors → OpenStreetMap POI counts (free) or
- *         Yelp/Foursquare/Google Places (paid)
- *       • Schools      → GreatSchools API (paid) or NCES test data (free)
- *     Each is marked TODO in `toFactors()` below — that function is the one
- *     place to plug richer sources in.
- *   - Unit = ZCTA (ZIP). Neighborhood *names* need a gazetteer (OpenStreetMap /
- *     Who's On First); here we label by "ZIP <code>" until that layer is added.
+ * STILL TODO for full production quality (documented, not hidden):
+ *   - Walkability → EPA National Walkability Index (per block group).
+ *   - Schools     → GreatSchools API (paid) or NCES test scores (finer than education).
+ *   - Names       → neighborhood-name gazetteer (OSM / Who's On First); we label
+ *                   by "ZIP <code>" until that layer is added.
  *
  * USAGE:
- *   1. Get a free key: https://api.census.gov/data/key_signup.html
- *   2. export CENSUS_API_KEY=xxxx: ; edit scripts/metros.json with your ZIPs
+ *   1. Free Census key: https://api.census.gov/data/key_signup.html
+ *   2. export CENSUS_API_KEY=xxxx   ; edit scripts/metros.json with your ZIPs
  *   3. node scripts/build-neighborhoods.mjs
- *   4. To use the output, merge data/neighborhoods.generated.json into
- *      lib/neighborhoods.ts (see README → "Scaling to real US cities").
+ *   4. Merge data/neighborhoods.generated.json into lib/neighborhoods.ts
+ *      (see README → "Scaling to real US cities").
  *
- * Requires Node 18+ (global fetch) and network access.
+ * Requires Node 18+ (global fetch) and network access. Overpass is rate-limited,
+ * so this is paced (~1.2s/POI query) and best run for a handful of metros at a time.
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -43,64 +39,77 @@ if (!KEY) {
   process.exit(1);
 }
 
-// ACS 5-year variables we pull per ZCTA.
-const VARS = {
-  income: "B19013_001E", // median household income
-  rent: "B25064_001E", // median gross rent
-  age: "B01002_001E", // median age
-  pop: "B01003_001E", // total population
-  bachelors: "B15003_022E", // bachelor's degree count
-  eduDenom: "B15003_001E", // education universe (25+)
-};
-
+const OVERPASS = "https://overpass-api.de/api/interpreter";
+const RADIUS_M = 1609; // ~1 mile around each ZCTA centroid
+const UA = "MyMik-POC/1.0 (neighborhood ingestion; contact: you@example.com)";
 const GAZETTEER =
   `https://www2.census.gov/geo/docs/maps-data/data/gazetteer/${YEAR}_Gazetteer/${YEAR}_Gaz_zcta_national.txt`;
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// --- Census: ZCTA centroids (for map coordinates) --------------------------
 async function fetchCentroids() {
-  // ZCTA gazetteer is a tab-separated file: GEOID ... INTPTLAT INTPTLONG
-  const res = await fetch(GAZETTEER);
+  const res = await fetch(GAZETTEER, { headers: { "User-Agent": UA } });
   if (!res.ok) throw new Error(`gazetteer ${res.status}`);
-  const text = await res.text();
-  const rows = text.trim().split("\n");
-  const header = rows[0].split("\t").map((h) => h.trim());
-  const gi = header.indexOf("GEOID");
-  const la = header.indexOf("INTPTLAT");
-  const lo = header.indexOf("INTPTLONG");
+  const rows = (await res.text()).trim().split("\n");
+  const head = rows[0].split("\t").map((h) => h.trim());
+  const gi = head.indexOf("GEOID");
+  const la = head.indexOf("INTPTLAT");
+  const lo = head.indexOf("INTPTLONG");
   const map = new Map();
   for (const row of rows.slice(1)) {
     const c = row.split("\t");
-    map.set(c[gi].trim(), {
-      lat: Number(c[la]),
-      lng: Number(c[lo]),
-    });
+    map.set(c[gi].trim(), { lat: Number(c[la]), lng: Number(c[lo]) });
   }
   return map;
 }
 
-async function fetchAcsForZips(zips) {
-  const get = ["NAME", ...Object.values(VARS)].join(",");
-  const list = zips.join(",");
-  const url = `https://api.census.gov/data/${YEAR}/acs/acs5?get=${get}&for=zip%20code%20tabulation%20area:${list}&key=${KEY}`;
-  const res = await fetch(url);
+// --- Census: education (schools proxy) -------------------------------------
+async function fetchEducation(zips) {
+  const get = ["NAME", "B15003_022E", "B15003_001E"].join(",");
+  const url = `https://api.census.gov/data/${YEAR}/acs/acs5?get=${get}&for=zip%20code%20tabulation%20area:${zips.join(",")}&key=${KEY}`;
+  const res = await fetch(url, { headers: { "User-Agent": UA } });
   if (!res.ok) throw new Error(`ACS ${res.status}: ${await res.text()}`);
-  const [head, ...data] = await res.json();
-  const idx = Object.fromEntries(head.map((h, i) => [h, i]));
-  return data.map((row) => {
-    const num = (v) => {
-      const n = Number(row[idx[VARS[v]]]);
-      return Number.isFinite(n) && n >= 0 ? n : null;
-    };
-    const bachelors = num("bachelors");
-    const eduDenom = num("eduDenom");
-    return {
-      zip: row[idx["zip code tabulation area"]],
-      income: num("income"),
-      rent: num("rent"),
-      age: num("age"),
-      pop: num("pop"),
-      eduPct: bachelors && eduDenom ? (100 * bachelors) / eduDenom : null,
-    };
+  const [h, ...data] = await res.json();
+  const zi = h.indexOf("zip code tabulation area");
+  const bi = h.indexOf("B15003_022E");
+  const di = h.indexOf("B15003_001E");
+  const out = new Map();
+  for (const row of data) {
+    const bach = Number(row[bi]);
+    const denom = Number(row[di]);
+    out.set(row[zi], denom > 0 ? (100 * bach) / denom : null);
+  }
+  return out;
+}
+
+// --- OpenStreetMap: POI counts within RADIUS_M of a point ------------------
+async function fetchOsmCounts(lat, lng, attempt = 0) {
+  const q = `[out:json][timeout:90];
+(nwr(around:${RADIUS_M},${lat},${lng})[shop];nwr(around:${RADIUS_M},${lat},${lng})[amenity~"^(restaurant|cafe|fast_food|marketplace|pharmacy|bank|food_court)$"];)->.amen;
+(nwr(around:${RADIUS_M},${lat},${lng})[amenity~"^(bar|pub|nightclub|biergarten)$"];nwr(around:${RADIUS_M},${lat},${lng})[leisure=nightclub];)->.night;
+(nwr(around:${RADIUS_M},${lat},${lng})[leisure~"^(park|garden|nature_reserve|dog_park)$"];nwr(around:${RADIUS_M},${lat},${lng})[natural~"^(wood|water|beach|scrub)$"];)->.outd;
+.amen out count;
+.night out count;
+.outd out count;`;
+  const res = await fetch(OVERPASS, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain", "User-Agent": UA },
+    body: q,
   });
+  if (res.status === 429 || res.status === 504) {
+    if (attempt < 3) {
+      await sleep(5000 * (attempt + 1));
+      return fetchOsmCounts(lat, lng, attempt + 1);
+    }
+    throw new Error(`Overpass ${res.status} after retries`);
+  }
+  if (!res.ok) throw new Error(`Overpass ${res.status}`);
+  const counts = (await res.json()).elements
+    .filter((e) => e.type === "count")
+    .map((e) => Number(e.tags.total));
+  const [amenities, nightlife, outdoors] = counts;
+  return { amenities, nightlife, outdoors, total: amenities + nightlife + outdoors };
 }
 
 // Min-max normalize a metric across the metro to 0-100 (null-safe).
@@ -108,52 +117,61 @@ function normalizer(values) {
   const nums = values.filter((v) => v != null);
   const min = Math.min(...nums);
   const max = Math.max(...nums);
-  return (v) => (v == null || max === min ? 50 : Math.round((100 * (v - min)) / (max - min)));
+  return (v) =>
+    v == null || max === min ? 50 : Math.round((100 * (v - min)) / (max - min));
 }
 
-// Map normalized Census signals onto MyMik's 5 factors.
-// NOTE: walkability/amenities/nightlife/outdoors are APPROXIMATE here — this is
-// the single place to plug in EPA walkability, OSM POIs, and school ratings.
 function toFactors(n, norm) {
-  const income = norm.income(n.income);
-  const rent = norm.rent(n.rent);
-  const age = norm.age(n.age);
-  const pop = norm.pop(n.pop);
-  const edu = norm.edu(n.eduPct);
-  const youth = 100 - age; // younger areas → more nightlife (rough)
   return {
-    Walkability: pop, // TODO: replace with EPA National Walkability Index
-    Amenities: Math.round((income + rent) / 2), // TODO: OSM POI density
-    Schools: edu, // TODO: GreatSchools / NCES ratings
-    Nightlife: Math.round((pop + youth) / 2), // TODO: OSM bar/venue counts
-    Outdoors: 100 - pop, // TODO: OSM parks/trails; lower density ~ more green
+    Walkability: norm.total(n.total), // POI density proxy (TODO: EPA index)
+    Amenities: norm.amenities(n.amenities),
+    Schools: norm.edu(n.eduPct), // education proxy (TODO: school ratings)
+    Nightlife: norm.nightlife(n.nightlife),
+    Outdoors: norm.outdoors(n.outdoors),
   };
 }
 
 async function main() {
-  const metros = JSON.parse(readFileSync("scripts/metros.json", "utf8"));
-  console.log(`Fetching gazetteer centroids…`);
+  console.log("Fetching gazetteer centroids…");
   const centroids = await fetchCentroids();
+  const metros = JSON.parse(readFileSync("scripts/metros.json", "utf8"));
 
   const out = [];
   for (const metro of metros) {
-    console.log(`ACS for ${metro.city} (${metro.zips.length} ZIPs)…`);
-    const rows = await fetchAcsForZips(metro.zips);
+    console.log(`\n${metro.city} — education (ACS)…`);
+    const edu = await fetchEducation(metro.zips);
+
+    const raw = [];
+    for (const zip of metro.zips) {
+      const c = centroids.get(zip);
+      if (!c) {
+        console.warn(`  ZIP ${zip}: no centroid, skipping`);
+        continue;
+      }
+      process.stdout.write(`  ZIP ${zip}: OSM POIs… `);
+      try {
+        const osm = await fetchOsmCounts(c.lat, c.lng);
+        console.log(`amen ${osm.amenities}, night ${osm.nightlife}, out ${osm.outdoors}`);
+        raw.push({ zip, coords: c, eduPct: edu.get(zip) ?? null, ...osm });
+      } catch (err) {
+        console.log(`failed (${err.message})`);
+      }
+      await sleep(1200); // be polite to Overpass
+    }
+
     const norm = {
-      income: normalizer(rows.map((r) => r.income)),
-      rent: normalizer(rows.map((r) => r.rent)),
-      age: normalizer(rows.map((r) => r.age)),
-      pop: normalizer(rows.map((r) => r.pop)),
-      edu: normalizer(rows.map((r) => r.eduPct)),
+      total: normalizer(raw.map((r) => r.total)),
+      amenities: normalizer(raw.map((r) => r.amenities)),
+      nightlife: normalizer(raw.map((r) => r.nightlife)),
+      outdoors: normalizer(raw.map((r) => r.outdoors)),
+      edu: normalizer(raw.map((r) => r.eduPct)),
     };
-    for (const r of rows) {
-      const c = centroids.get(r.zip);
-      if (!c) continue;
+    for (const r of raw) {
       out.push({
         id: `zcta-${r.zip}`,
         city: metro.city,
-        name: `ZIP ${r.zip}`, // TODO: neighborhood name gazetteer (OSM / WOF)
-        coords: c,
+        name: `ZIP ${r.zip}`, // TODO: neighborhood-name gazetteer
+        coords: r.coords,
         attrs: toFactors(r, norm),
       });
     }
@@ -161,7 +179,7 @@ async function main() {
 
   mkdirSync("data", { recursive: true });
   writeFileSync("data/neighborhoods.generated.json", JSON.stringify(out, null, 2));
-  console.log(`Wrote ${out.length} neighborhoods → data/neighborhoods.generated.json`);
+  console.log(`\nWrote ${out.length} neighborhoods → data/neighborhoods.generated.json`);
 }
 
 main().catch((err) => {
