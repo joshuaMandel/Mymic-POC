@@ -20,17 +20,18 @@
  *   - Walkability → EPA National Walkability Index (per block group).
  *   - Schools     → GreatSchools API (paid) or NCES test scores (finer than education).
  *
- * USAGE:
+ * USAGE (the ingestion GitHub Action does all of this automatically):
  *   1. Free Census key: https://api.census.gov/data/key_signup.html → export CENSUS_API_KEY=xxxx
  *   2. Download + unzip the ZCTA gazetteer (it's a .zip) to data/gaz_zcta.txt:
  *      https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2022_Gazetteer/2022_Gaz_zcta_national.zip
- *   3. Edit scripts/metros.json with the metros + ZIPs you want
+ *   3. node scripts/build-metros.mjs   → data/metros.generated.json
+ *      (which metros + ZIPs to ingest, chosen by Census population — no hand-picked lists)
  *   4. node scripts/build-neighborhoods.mjs
- *   5. Merge data/neighborhoods.generated.json into lib/neighborhoods.ts
- *      (see README → "Scaling to real US cities").
+ *      Resumable: raw API counts are stored per record, so re-runs reuse
+ *      finished ZIPs and only fetch missing ones (budget: MAX_FETCHES, def. 250).
  *
  * Requires Node 18+ (global fetch) and network access. Overpass is rate-limited,
- * so this is paced (~1.2s/POI query) and best run for a handful of metros at a time.
+ * so this is paced (~1.2s/POI query).
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
@@ -208,30 +209,82 @@ function toFactors(n, norm) {
   };
 }
 
+// Metro list comes from build-metros.mjs (100% Census-derived — no hand-picked
+// cities or ZIPs anywhere).
+const METROS_FILE = process.env.METROS || "data/metros.generated.json";
+// Fetch budget per run: ingestion is RESUMABLE. Raw API counts are stored in
+// the output, so already-ingested ZIPs are reused and each run only fetches
+// what's missing — coverage accumulates run over run without CI timeouts.
+const MAX_FETCHES = Number(process.env.MAX_FETCHES || 250);
+const OUT_FILE = "data/neighborhoods.generated.json";
+
+function loadExisting() {
+  try {
+    const arr = JSON.parse(readFileSync(OUT_FILE, "utf8"));
+    const byZip = new Map();
+    for (const rec of Array.isArray(arr) ? arr : []) {
+      const m = /^zcta-(\d{5})$/.exec(rec?.id ?? "");
+      // Only records that carry their raw API measurements are reusable —
+      // older records (or garbage from a bad run) get re-fetched.
+      if (m && rec.raw && rec.nameLookedUp) byZip.set(m[1], rec);
+    }
+    return byZip;
+  } catch {
+    return new Map();
+  }
+}
+
 async function main() {
   const centroids = readCentroids();
   console.log(`Loaded ${centroids.size} ZCTA centroids from ${ZCTA_GAZ}`);
-  const metros = JSON.parse(readFileSync("scripts/metros.json", "utf8"));
+  if (!existsSync(METROS_FILE)) {
+    console.error(
+      `Missing ${METROS_FILE} — run \`node scripts/build-metros.mjs\` first ` +
+        `(the ingestion workflow does this automatically).`
+    );
+    process.exit(1);
+  }
+  const metros = JSON.parse(readFileSync(METROS_FILE, "utf8"));
+  const existing = loadExisting();
+  console.log(`Resuming: ${existing.size} ZIPs already ingested; fetch budget ${MAX_FETCHES}`);
 
+  let fetches = 0;
+  let skipped = 0;
   const out = [];
   for (const metro of metros) {
-    console.log(`\n${metro.city} — education (ACS)…`);
-    const edu = await fetchEducation(metro.zips);
     // The metro's own city name, so we don't label a ZIP "Portland" in Portland.
     const cityOnly = metro.city.split(",")[0].trim();
+    const missing = metro.zips.filter((z) => !existing.has(z));
+
+    let edu = new Map();
+    if (missing.length > 0 && fetches < MAX_FETCHES) {
+      console.log(`\n${metro.city} — education (ACS)…`);
+      edu = await fetchEducation(metro.zips);
+    } else if (missing.length === 0) {
+      console.log(`\n${metro.city} — complete (reusing ${metro.zips.length} ZIPs)`);
+    }
 
     const raw = [];
     for (const zip of metro.zips) {
+      const prior = existing.get(zip);
+      if (prior) {
+        raw.push({ zip, coords: prior.coords, name: prior.rawName ?? null, ...prior.raw });
+        continue;
+      }
+      if (fetches >= MAX_FETCHES) {
+        skipped++;
+        continue; // budget spent — next run picks this ZIP up
+      }
       const c = centroids.get(zip);
       if (!c) {
         console.warn(`  ZIP ${zip}: no centroid, skipping`);
         continue;
       }
       process.stdout.write(`  ZIP ${zip}: OSM POIs… `);
+      fetches++;
       try {
         const osm = await fetchOsmCounts(c.lat, c.lng);
         process.stdout.write(`amen ${osm.amenities}, night ${osm.nightlife}, out ${osm.outdoors}`);
-        // Reverse-geocode the centroid to a real neighborhood name.
         const name = await fetchPlaceName(c.lat, c.lng, [cityOnly]);
         console.log(name ? ` → ${name}` : ` → (no name)`);
         raw.push({ zip, coords: c, eduPct: edu.get(zip) ?? null, name, ...osm });
@@ -241,6 +294,7 @@ async function main() {
       await sleep(1200); // be polite to the Overpass mirrors
     }
 
+    // Normalize within the metro from RAW values (reused + newly fetched alike).
     const norm = {
       total: normalizer(raw.map((r) => r.total)),
       amenities: normalizer(raw.map((r) => r.amenities)),
@@ -252,20 +306,33 @@ async function main() {
     for (const r of raw) {
       const label = r.name
         ? dedupeName(r.name, r.zip, used)
-        : `ZIP ${r.zip}`; // fallback when reverse-geocode found nothing
+        : `ZIP ${r.zip}`; // fallback when the place-name lookup found nothing
       out.push({
-        id: `zcta-${r.zip}`, // stable id (ZIP) even though the display name is now real
+        id: `zcta-${r.zip}`, // stable id (ZIP) even though the display name is real
         city: metro.city,
         name: label,
         coords: r.coords,
         attrs: toFactors(r, norm),
+        // Raw measurements + name bookkeeping make future runs resumable.
+        raw: {
+          amenities: r.amenities,
+          nightlife: r.nightlife,
+          outdoors: r.outdoors,
+          total: r.total,
+          eduPct: r.eduPct ?? null,
+        },
+        rawName: r.name ?? null,
+        nameLookedUp: true,
       });
     }
   }
 
   mkdirSync("data", { recursive: true });
-  writeFileSync("data/neighborhoods.generated.json", JSON.stringify(out, null, 2));
-  console.log(`\nWrote ${out.length} neighborhoods → data/neighborhoods.generated.json`);
+  writeFileSync(OUT_FILE, JSON.stringify(out, null, 2));
+  console.log(
+    `\nWrote ${out.length} neighborhoods → ${OUT_FILE} ` +
+      `(${fetches} fetched this run, ${skipped} deferred to the next run)`
+  );
 }
 
 main().catch((err) => {
