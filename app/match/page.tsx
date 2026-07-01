@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
-import { cityPairs } from "@/lib/data";
+import {
+  originCityNames,
+  destinationCityNames,
+  neighborhoodsForOrigin,
+} from "@/lib/data";
 
 type Metric = { name: string; importance: number };
 
@@ -17,11 +21,11 @@ const IMPORTANCE_LABELS: Record<number, string> = {
 export default function MatchPage() {
   const router = useRouter();
 
-  const [pairId, setPairId] = useState(cityPairs[0].id);
-  const pair = cityPairs.find((p) => p.id === pairId) ?? cityPairs[0];
-
+  const [origin, setOrigin] = useState(originCityNames[0]);
+  const [destination, setDestination] = useState(destinationCityNames[0]);
+  const neighborhoods = neighborhoodsForOrigin(origin);
   const [currentNeighborhood, setCurrentNeighborhood] = useState(
-    cityPairs[0].matches[0].familiar
+    neighborhoods[0]
   );
 
   const [metrics, setMetrics] = useState<Metric[]>([
@@ -31,11 +35,10 @@ export default function MatchPage() {
     { name: "Churches/Temples", importance: 2 },
   ]);
 
-  function selectPair(id: string) {
-    const next = cityPairs.find((p) => p.id === id) ?? cityPairs[0];
-    setPairId(next.id);
-    // The origin changed, so reset to a neighborhood that exists there.
-    setCurrentNeighborhood(next.matches[0].familiar);
+  function selectOrigin(next: string) {
+    setOrigin(next);
+    // Reset to a neighborhood that exists in the new origin city.
+    setCurrentNeighborhood(neighborhoodsForOrigin(next)[0]);
   }
 
   function updateMetric(index: number, patch: Partial<Metric>) {
@@ -47,8 +50,8 @@ export default function MatchPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const params = new URLSearchParams({
-      from: pair.origin,
-      to: pair.destination,
+      from: origin,
+      to: destination,
       neighborhood: currentNeighborhood,
       metrics: metrics
         .filter((m) => m.name.trim().length > 0)
@@ -89,40 +92,32 @@ export default function MatchPage() {
                 Relocation details
               </h2>
               <span className="rounded-full bg-brand-purple/10 px-2.5 py-1 text-[11px] font-semibold text-brand-purple">
-                {cityPairs.length} demo cities
+                Mix &amp; match
               </span>
             </div>
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
               <Field label="Current city">
                 <select
-                  value={pair.origin}
-                  onChange={(e) => {
-                    const p = cityPairs.find((x) => x.origin === e.target.value);
-                    if (p) selectPair(p.id);
-                  }}
+                  value={origin}
+                  onChange={(e) => selectOrigin(e.target.value)}
                   className="input"
                 >
-                  {cityPairs.map((p) => (
-                    <option key={p.id} value={p.origin}>
-                      {p.origin}
+                  {originCityNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
                     </option>
                   ))}
                 </select>
               </Field>
               <Field label="Destination city">
                 <select
-                  value={pair.destination}
-                  onChange={(e) => {
-                    const p = cityPairs.find(
-                      (x) => x.destination === e.target.value
-                    );
-                    if (p) selectPair(p.id);
-                  }}
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
                   className="input"
                 >
-                  {cityPairs.map((p) => (
-                    <option key={p.id} value={p.destination}>
-                      {p.destination}
+                  {destinationCityNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
                     </option>
                   ))}
                 </select>
@@ -134,16 +129,16 @@ export default function MatchPage() {
                     onChange={(e) => setCurrentNeighborhood(e.target.value)}
                     className="input"
                   >
-                    {pair.matches.map((m) => (
-                      <option key={m.id} value={m.familiar}>
-                        {m.familiar}
+                    {neighborhoods.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
                       </option>
                     ))}
                   </select>
                 </Field>
                 <p className="mt-2 text-xs text-brand-text/50">
-                  Pick the {pair.origin.split(",")[0]} neighborhood you know best —
-                  we&apos;ll find its match in {pair.destination.split(",")[0]}.
+                  Pick the {origin.split(",")[0]} neighborhood you know best —
+                  we&apos;ll find its match in {destination.split(",")[0]}.
                 </p>
               </div>
             </div>
