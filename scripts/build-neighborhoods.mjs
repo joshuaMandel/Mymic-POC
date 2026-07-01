@@ -100,7 +100,7 @@ async function fetchEducation(zips) {
 
 // --- OpenStreetMap: POI counts within RADIUS_M of a point ------------------
 async function fetchOsmCounts(lat, lng, attempt = 0) {
-  const q = `[out:json][timeout:90];
+  const q = `[out:json][timeout:25];
 (nwr(around:${RADIUS_M},${lat},${lng})[shop];nwr(around:${RADIUS_M},${lat},${lng})[amenity~"^(restaurant|cafe|fast_food|marketplace|pharmacy|bank|food_court)$"];)->.amen;
 (nwr(around:${RADIUS_M},${lat},${lng})[amenity~"^(bar|pub|nightclub|biergarten)$"];nwr(around:${RADIUS_M},${lat},${lng})[leisure=nightclub];)->.night;
 (nwr(around:${RADIUS_M},${lat},${lng})[leisure~"^(park|garden|nature_reserve|dog_park)$"];nwr(around:${RADIUS_M},${lat},${lng})[natural~"^(wood|water|beach|scrub)$"];)->.outd;
@@ -108,10 +108,15 @@ async function fetchOsmCounts(lat, lng, attempt = 0) {
 .night out count;
 .outd out count;`;
   // Try each mirror in turn; retry the whole rotation a few times with backoff.
-  const MAX_ROUNDS = 4;
+  // A per-request abort caps how long one slow/hung mirror can stall us — the
+  // Overpass server-side timeout (25s above) plus a little slack.
+  const MAX_ROUNDS = 3;
+  const REQ_TIMEOUT_MS = 30_000;
   for (let round = attempt; round < MAX_ROUNDS; round++) {
     for (const endpoint of OVERPASS_ENDPOINTS) {
       let res;
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), REQ_TIMEOUT_MS);
       try {
         res = await fetch(endpoint, {
           method: "POST",
@@ -122,9 +127,12 @@ async function fetchOsmCounts(lat, lng, attempt = 0) {
             "User-Agent": UA,
           },
           body: "data=" + encodeURIComponent(q),
+          signal: ctrl.signal,
         });
       } catch {
-        continue; // network error — try the next mirror
+        continue; // network error / timeout — try the next mirror
+      } finally {
+        clearTimeout(t);
       }
       if (res.ok) {
         const counts = (await res.json()).elements
@@ -135,7 +143,8 @@ async function fetchOsmCounts(lat, lng, attempt = 0) {
       }
       // 406/429/5xx/504: this mirror is busy or picky — fall through to the next.
     }
-    await sleep(4000 * (round + 1)); // backoff before re-trying the rotation
+    // Backoff before re-trying the rotation, but not after the final round.
+    if (round < MAX_ROUNDS - 1) await sleep(2500 * (round + 1));
   }
   throw new Error("Overpass unavailable on all mirrors after retries");
 }
