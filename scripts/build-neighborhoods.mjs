@@ -9,8 +9,9 @@
  *       • Outdoors   = parks + gardens + nature reserves + natural features
  *       • Walkability = total POI density (proxy; EPA index is the gold standard)
  *   - US Census ACS 5-year → Schools proxy (share of adults with a bachelor's+).
- *   - OpenStreetMap via Nominatim → reverse-geocode each ZIP centroid to a real
- *       neighborhood name (e.g. "Pearl District"); falls back to "ZIP <code>".
+ *   - OpenStreetMap place nodes (via Overpass) → nearest neighbourhood/quarter/
+ *       suburb node names each ZIP (e.g. "Pearl District"); falls back to
+ *       "ZIP <code>". (Nominatim blocks CI/cloud IPs, so Overpass it is.)
  *   Each metric is normalized to 0-100 WITHIN its metro so cities are comparable,
  *   then written to data/neighborhoods.generated.json in the exact shape of
  *   lib/neighborhoods.ts `Neighborhood[]`.
@@ -33,7 +34,8 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { pickPlaceName, dedupeName } from "./lib/place-name.mjs";
+import { dedupeName } from "./lib/place-name.mjs";
+import { pickNearestPlaceName } from "./lib/zip-lookup.mjs";
 
 const YEAR = 2022;
 const KEY = process.env.CENSUS_API_KEY;
@@ -50,9 +52,6 @@ const OVERPASS_ENDPOINTS = [
   "https://overpass.osm.ch/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
 ];
-// Nominatim reverse-geocodes a ZIP centroid into a real neighborhood name.
-// Free, but the usage policy caps us at ≤1 req/sec with an identifying UA.
-const NOMINATIM = "https://nominatim.openstreetmap.org/reverse";
 const RADIUS_M = 1609; // ~1 mile around each ZCTA centroid
 const UA = "MyMik-POC/1.0 (neighborhood ingestion; contact: you@example.com)";
 // The Census ZCTA gazetteer ships as a .zip — download + unzip it to this path.
@@ -102,21 +101,16 @@ async function fetchEducation(zips) {
   return out;
 }
 
-// --- OpenStreetMap: POI counts within RADIUS_M of a point ------------------
-async function fetchOsmCounts(lat, lng, attempt = 0) {
-  const q = `[out:json][timeout:25];
-(nwr(around:${RADIUS_M},${lat},${lng})[shop];nwr(around:${RADIUS_M},${lat},${lng})[amenity~"^(restaurant|cafe|fast_food|marketplace|pharmacy|bank|food_court)$"];)->.amen;
-(nwr(around:${RADIUS_M},${lat},${lng})[amenity~"^(bar|pub|nightclub|biergarten)$"];nwr(around:${RADIUS_M},${lat},${lng})[leisure=nightclub];)->.night;
-(nwr(around:${RADIUS_M},${lat},${lng})[leisure~"^(park|garden|nature_reserve|dog_park)$"];nwr(around:${RADIUS_M},${lat},${lng})[natural~"^(wood|water|beach|scrub)$"];)->.outd;
-.amen out count;
-.night out count;
-.outd out count;`;
-  // Try each mirror in turn; retry the whole rotation a few times with backoff.
-  // A per-request abort caps how long one slow/hung mirror can stall us — the
-  // Overpass server-side timeout (25s above) plus a little slack.
+// --- Overpass plumbing -------------------------------------------------------
+// Rotate across mirrors, retrying with backoff. `validate(json)` must return
+// the parsed value or null; null means "this mirror gave a bad/partial answer,
+// try the next one". CRITICAL: when Overpass hits its server-side [timeout:..]
+// it returns HTTP 200 with a `remark` and ZERO counts — trusting res.ok alone
+// once committed a metro of silent flat-50 garbage. Callers must validate.
+async function overpassQuery(q, validate) {
   const MAX_ROUNDS = 3;
-  const REQ_TIMEOUT_MS = 30_000;
-  for (let round = attempt; round < MAX_ROUNDS; round++) {
+  const REQ_TIMEOUT_MS = 70_000; // server-side [timeout:60] + slack
+  for (let round = 0; round < MAX_ROUNDS; round++) {
     for (const endpoint of OVERPASS_ENDPOINTS) {
       let res;
       const ctrl = new AbortController();
@@ -138,14 +132,18 @@ async function fetchOsmCounts(lat, lng, attempt = 0) {
       } finally {
         clearTimeout(t);
       }
-      if (res.ok) {
-        const counts = (await res.json()).elements
-          .filter((e) => e.type === "count")
-          .map((e) => Number(e.tags.total));
-        const [amenities, nightlife, outdoors] = counts;
-        return { amenities, nightlife, outdoors, total: amenities + nightlife + outdoors };
+      if (!res.ok) continue; // 406/429/5xx: busy or picky mirror
+      let json;
+      try {
+        json = await res.json();
+      } catch {
+        continue;
       }
-      // 406/429/5xx/504: this mirror is busy or picky — fall through to the next.
+      // A `remark` means the query timed out or errored server-side — the
+      // payload may parse fine but the numbers in it are garbage.
+      if (json?.remark) continue;
+      const value = validate(json);
+      if (value !== null) return value;
     }
     // Backoff before re-trying the rotation, but not after the final round.
     if (round < MAX_ROUNDS - 1) await sleep(2500 * (round + 1));
@@ -153,27 +151,41 @@ async function fetchOsmCounts(lat, lng, attempt = 0) {
   throw new Error("Overpass unavailable on all mirrors after retries");
 }
 
-// --- OpenStreetMap: reverse-geocode a centroid to a neighborhood name -------
-// Returns the Nominatim `address` object, or null on any failure (the caller
-// falls back to "ZIP <code>", so a geocode miss never breaks ingestion).
-async function reverseGeocodeAddress(lat, lng) {
-  const url =
-    `${NOMINATIM}?format=jsonv2&lat=${lat}&lon=${lng}` +
-    `&zoom=14&addressdetails=1`;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 15_000);
+// --- OpenStreetMap: POI counts within RADIUS_M of a point ------------------
+async function fetchOsmCounts(lat, lng) {
+  const q = `[out:json][timeout:60];
+(nwr(around:${RADIUS_M},${lat},${lng})[shop];nwr(around:${RADIUS_M},${lat},${lng})[amenity~"^(restaurant|cafe|fast_food|marketplace|pharmacy|bank|food_court)$"];)->.amen;
+(nwr(around:${RADIUS_M},${lat},${lng})[amenity~"^(bar|pub|nightclub|biergarten)$"];nwr(around:${RADIUS_M},${lat},${lng})[leisure=nightclub];)->.night;
+(nwr(around:${RADIUS_M},${lat},${lng})[leisure~"^(park|garden|nature_reserve|dog_park)$"];nwr(around:${RADIUS_M},${lat},${lng})[natural~"^(wood|water|beach|scrub)$"];)->.outd;
+.amen out count;
+.night out count;
+.outd out count;`;
+  return overpassQuery(q, (json) => {
+    const counts = (json?.elements ?? [])
+      .filter((e) => e.type === "count")
+      .map((e) => Number(e?.tags?.total));
+    // All three counts must be present and numeric, else the answer is partial.
+    if (counts.length !== 3 || counts.some((n) => !Number.isFinite(n))) return null;
+    const [amenities, nightlife, outdoors] = counts;
+    return { amenities, nightlife, outdoors, total: amenities + nightlife + outdoors };
+  });
+}
+
+// --- OpenStreetMap: neighborhood name from nearby `place` nodes -------------
+// Nominatim blocks CI/cloud IPs, so names come from Overpass instead: fetch
+// place=neighbourhood|quarter|suburb nodes near the centroid and let the pure
+// picker choose. Returns null on any failure (caller falls back to "ZIP <code>").
+async function fetchPlaceName(lat, lng, exclude) {
+  const q = `[out:json][timeout:30];
+node(around:3000,${lat},${lng})[place~"^(neighbourhood|quarter|suburb)$"][name];
+out body 40;`;
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": UA, "Accept-Language": "en" },
-      signal: ctrl.signal,
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json?.address ?? null;
+    const elements = await overpassQuery(q, (json) =>
+      Array.isArray(json?.elements) ? json.elements : null
+    );
+    return pickNearestPlaceName(elements, { lat, lng }, { exclude });
   } catch {
     return null;
-  } finally {
-    clearTimeout(t);
   }
 }
 
@@ -220,15 +232,13 @@ async function main() {
         const osm = await fetchOsmCounts(c.lat, c.lng);
         process.stdout.write(`amen ${osm.amenities}, night ${osm.nightlife}, out ${osm.outdoors}`);
         // Reverse-geocode the centroid to a real neighborhood name.
-        const addr = await reverseGeocodeAddress(c.lat, c.lng);
-        const name = pickPlaceName(addr, { exclude: [cityOnly] });
+        const name = await fetchPlaceName(c.lat, c.lng, [cityOnly]);
         console.log(name ? ` → ${name}` : ` → (no name)`);
         raw.push({ zip, coords: c, eduPct: edu.get(zip) ?? null, name, ...osm });
       } catch (err) {
         console.log(`failed (${err.message})`);
       }
-      // Pace for both Overpass and Nominatim (≤1 req/sec) politeness.
-      await sleep(1200);
+      await sleep(1200); // be polite to the Overpass mirrors
     }
 
     const norm = {

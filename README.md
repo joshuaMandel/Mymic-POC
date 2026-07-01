@@ -115,6 +115,29 @@ so the page never breaks.
   "matches": [ /* ScoredMatch[] */ ], "aiGenerated": true }
 ```
 
+### ZIP lookup — `GET /api/zip-lookup?zip=97209`
+
+The "Current city" field on `/match` is a **smart field**: type a city name *or* a
+5-digit ZIP. A ZIP hits this route, which resolves it to "you're in
+&lt;neighborhood&gt;, &lt;City, ST&gt;" and an engine-ready origin:
+
+1. **Data path** — ZIPs already ingested (`id: "zcta-<zip>"`) resolve instantly, offline.
+2. **Live path** — otherwise OpenStreetMap **Nominatim** (postal-code search +
+   reverse geocode), then the nearest known neighborhood by distance; suburbs
+   within 30 km of a dataset city are matched to it (e.g. 63122 "Kirkwood, MO" →
+   St. Louis's Kirkwood).
+
+```jsonc
+// → 200 (always; branch on `ok`)
+{ "ok": true, "zip": "97209",
+  "detected":  { "name": "Pearl District", "city": "Portland, OR" },   // display
+  "matchable": { "city": "Portland, OR", "neighborhood": "Pearl District" }, // engine input; null ⇒ preview
+  "source": "data" }
+```
+
+All decision logic is pure and offline-tested (`scripts/lib/zip-lookup.mjs`, `npm test`);
+only the two Nominatim fetches live in the route.
+
 ### Enabling AI explanations
 
 The app works with **no key** (templated explanations, `aiGenerated: false`). To turn on
