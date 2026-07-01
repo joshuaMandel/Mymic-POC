@@ -20,17 +20,19 @@
  *                   by "ZIP <code>" until that layer is added.
  *
  * USAGE:
- *   1. Free Census key: https://api.census.gov/data/key_signup.html
- *   2. export CENSUS_API_KEY=xxxx   ; edit scripts/metros.json with your ZIPs
- *   3. node scripts/build-neighborhoods.mjs
- *   4. Merge data/neighborhoods.generated.json into lib/neighborhoods.ts
+ *   1. Free Census key: https://api.census.gov/data/key_signup.html → export CENSUS_API_KEY=xxxx
+ *   2. Download + unzip the ZCTA gazetteer (it's a .zip) to data/gaz_zcta.txt:
+ *      https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2022_Gazetteer/2022_Gaz_zcta_national.zip
+ *   3. Edit scripts/metros.json with the metros + ZIPs you want
+ *   4. node scripts/build-neighborhoods.mjs
+ *   5. Merge data/neighborhoods.generated.json into lib/neighborhoods.ts
  *      (see README → "Scaling to real US cities").
  *
  * Requires Node 18+ (global fetch) and network access. Overpass is rate-limited,
  * so this is paced (~1.2s/POI query) and best run for a handful of metros at a time.
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 
 const YEAR = 2022;
 const KEY = process.env.CENSUS_API_KEY;
@@ -42,16 +44,22 @@ if (!KEY) {
 const OVERPASS = "https://overpass-api.de/api/interpreter";
 const RADIUS_M = 1609; // ~1 mile around each ZCTA centroid
 const UA = "MyMik-POC/1.0 (neighborhood ingestion; contact: you@example.com)";
-const GAZETTEER =
-  `https://www2.census.gov/geo/docs/maps-data/data/gazetteer/${YEAR}_Gazetteer/${YEAR}_Gaz_zcta_national.txt`;
+// The Census ZCTA gazetteer ships as a .zip — download + unzip it to this path.
+const ZCTA_GAZ = process.env.ZCTA_GAZ || "data/gaz_zcta.txt";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // --- Census: ZCTA centroids (for map coordinates) --------------------------
-async function fetchCentroids() {
-  const res = await fetch(GAZETTEER, { headers: { "User-Agent": UA } });
-  if (!res.ok) throw new Error(`gazetteer ${res.status}`);
-  const rows = (await res.text()).trim().split("\n");
+function readCentroids() {
+  if (!existsSync(ZCTA_GAZ)) {
+    console.error(
+      `ZCTA gazetteer not found at ${ZCTA_GAZ}. Download + unzip it first:\n` +
+        `  https://www2.census.gov/geo/docs/maps-data/data/gazetteer/${YEAR}_Gazetteer/${YEAR}_Gaz_zcta_national.zip\n` +
+        `  then move the .txt to ${ZCTA_GAZ} (or set ZCTA_GAZ=/path/to/file).`
+    );
+    process.exit(1);
+  }
+  const rows = readFileSync(ZCTA_GAZ, "utf8").trim().split("\n");
   const head = rows[0].split("\t").map((h) => h.trim());
   const gi = head.indexOf("GEOID");
   const la = head.indexOf("INTPTLAT");
@@ -132,8 +140,8 @@ function toFactors(n, norm) {
 }
 
 async function main() {
-  console.log("Fetching gazetteer centroids…");
-  const centroids = await fetchCentroids();
+  const centroids = readCentroids();
+  console.log(`Loaded ${centroids.size} ZCTA centroids from ${ZCTA_GAZ}`);
   const metros = JSON.parse(readFileSync("scripts/metros.json", "utf8"));
 
   const out = [];
