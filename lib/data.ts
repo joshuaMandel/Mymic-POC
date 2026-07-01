@@ -316,18 +316,89 @@ export const cityPairs: CityPair[] = [
 
 export const defaultCityPair = cityPairs[0];
 
-/** Find the supported pair for a given origin/destination, or fall back. */
+/** Distinct origin / destination city names for the pickers. */
+export const originCityNames = cityPairs.map((p) => p.origin);
+export const destinationCityNames = cityPairs.map((p) => p.destination);
+
+/** Familiar neighborhood names available in a given origin city. */
+export function neighborhoodsForOrigin(origin: string): string[] {
+  const pair = cityPairs.find((p) => p.origin === origin) ?? defaultCityPair;
+  return pair.matches.map((m) => m.familiar);
+}
+
+function topFactor(factors: MatchFactor[]): string {
+  return factors
+    .reduce((a, b) => (b.value > a.value ? b : a))
+    .label.toLowerCase();
+}
+
+const EXPLANATION_TEMPLATES: ((
+  familiar: string,
+  actual: string,
+  city: string,
+  top: string
+) => string)[] = [
+  (f, a, city, top) =>
+    `${a} is ${city}'s answer to ${f} — it scores highest on ${top}, with the same everyday feel that made ${f} home.`,
+  (f, a, _city, top) =>
+    `Know ${f}? ${a} carries a similar rhythm, and it's especially strong on ${top}.`,
+  (f, a, _city, top) =>
+    `${a} lands closest to ${f} here — leaning into ${top} while keeping that familiar neighborhood character.`,
+  (f, a, city, top) =>
+    `If ${f} is your baseline, ${a} is the ${city} match — notable for its ${top}.`,
+  (f, a, _city, top) =>
+    `${a} echoes ${f}: a comparable vibe, with ${top} as its standout.`,
+];
+
+/**
+ * Resolve the city pair to show. Exact curated pairs (e.g. St. Louis -> Denver)
+ * are returned as authored. Any other origin/destination combo is synthesized
+ * from the preloaded data: the origin's familiar neighborhoods are matched onto
+ * the destination's real neighborhoods (coords, factors, score), with generated
+ * explanations — so for the demo, any origin can be matched with any destination.
+ */
 export function getCityPair(
   origin?: string | null,
   destination?: string | null
 ): CityPair {
-  return (
-    cityPairs.find(
-      (p) =>
-        (origin == null || p.origin === origin) &&
-        (destination == null || p.destination === destination)
-    ) ?? defaultCityPair
+  const native = cityPairs.find(
+    (p) =>
+      (origin == null || p.origin === origin) &&
+      (destination == null || p.destination === destination)
   );
+  if (native) return native;
+
+  const originPair =
+    cityPairs.find((p) => p.origin === origin) ?? defaultCityPair;
+  const destPair =
+    cityPairs.find((p) => p.destination === destination) ?? defaultCityPair;
+
+  const familiarNames = originPair.matches.map((m) => m.familiar);
+  const destCityShort = destPair.destination.split(",")[0];
+
+  const matches: NeighborhoodMatch[] = destPair.matches.map((dm, i) => {
+    const familiar = familiarNames[i % familiarNames.length];
+    const template = EXPLANATION_TEMPLATES[i % EXPLANATION_TEMPLATES.length];
+    return {
+      ...dm,
+      familiar,
+      explanation: template(
+        familiar,
+        dm.actual,
+        destCityShort,
+        topFactor(dm.factors)
+      ),
+    };
+  });
+
+  return {
+    id: `${originPair.origin}__${destPair.destination}`,
+    origin: originPair.origin,
+    destination: destPair.destination,
+    center: destPair.center,
+    zoom: destPair.zoom,
+    matches,
+  };
 }
 
 // --- Personalized scoring ------------------------------------------------
