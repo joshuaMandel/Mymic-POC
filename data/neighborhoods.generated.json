@@ -8,11 +8,11 @@
       "lng": -86.789146
     },
     "attrs": {
-      "Walkability": 0,
-      "Amenities": 0,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 94,
-      "Nightlife": 0,
-      "Outdoors": 0
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -24,11 +24,11 @@
       "lng": -86.731083
     },
     "attrs": {
-      "Walkability": 35,
-      "Amenities": 22,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 81,
-      "Nightlife": 80,
-      "Outdoors": 61
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -40,11 +40,11 @@
       "lng": -86.801688
     },
     "attrs": {
-      "Walkability": 100,
-      "Amenities": 100,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 97,
-      "Nightlife": 100,
-      "Outdoors": 100
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -56,11 +56,11 @@
       "lng": -86.834904
     },
     "attrs": {
-      "Walkability": 7,
-      "Amenities": 0,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 100,
-      "Nightlife": 0,
-      "Outdoors": 25
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -72,11 +72,11 @@
       "lng": -86.777342
     },
     "attrs": {
-      "Walkability": 12,
-      "Amenities": 0,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 0,
-      "Nightlife": 0,
-      "Outdoors": 43
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -88,11 +88,11 @@
       "lng": -86.959839
     },
     "attrs": {
-      "Walkability": 9,
-      "Amenities": 0,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 54,
-      "Nightlife": 0,
-      "Outdoors": 32
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -104,11 +104,11 @@
       "lng": -86.723419
     },
     "attrs": {
-      "Walkability": 0,
-      "Amenities": 0,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 37,
-      "Nightlife": 0,
-      "Outdoors": 0
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -120,11 +120,11 @@
       "lng": -122.688283
     },
     "attrs": {
-      "Walkability": 68,
-      "Amenities": 53,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 0,
-      "Nightlife": 27,
-      "Outdoors": 100
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -136,11 +136,11 @@
       "lng": -122.644451
     },
     "attrs": {
-      "Walkability": 0,
-      "Amenities": 0,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 3,
-      "Nightlife": 0,
-      "Outdoors": 0
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -152,11 +152,11 @@
       "lng": -122.683951
     },
     "attrs": {
-      "Walkability": 100,
-      "Amenities": 100,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 19,
-      "Nightlife": 100,
-      "Outdoors": 31
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -168,11 +168,11 @@
       "lng": -122.736853
     },
     "attrs": {
-      "Walkability": 3,
-      "Amenities": 1,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 23,
-      "Nightlife": 0,
-      "Outdoors": 13
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -184,11 +184,11 @@
       "lng": -122.644031
     },
     "attrs": {
-      "Walkability": 72,
-      "Amenities": 73,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 100,
-      "Nightlife": 93,
-      "Outdoors": 8
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -200,11 +200,11 @@
       "lng": -122.695414
     },
     "attrs": {
-      "Walkability": 0,
-      "Amenities": 0,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 44,
-      "Nightlife": 0,
-      "Outdoors": 0
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   },
   {
@@ -216,11 +216,11 @@
       "lng": -122.600014
     },
     "attrs": {
-      "Walkability": 20,
-      "Amenities": 20,
+      "Walkability": 50,
+      "Amenities": 50,
       "Schools": 16,
-      "Nightlife": 16,
-      "Outdoors": 11
+      "Nightlife": 50,
+      "Outdoors": 50
     }
   }
 ]
