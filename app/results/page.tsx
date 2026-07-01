@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -12,6 +12,17 @@ import {
   type ScoredMatch,
   type Preference,
 } from "@/lib/data";
+
+// Shape returned by POST /api/match (scoring + optional AI-generated explanations).
+type MatchResponse = {
+  from: string;
+  to: string;
+  neighborhood: string;
+  center: { lat: number; lng: number };
+  zoom: number;
+  matches: ScoredMatch[];
+  aiGenerated: boolean;
+};
 
 // Leaflet touches `window`, so load the map only in the browser.
 const NeighborhoodMap = dynamic(() => import("./NeighborhoodMap"), {
@@ -42,15 +53,9 @@ function ResultsFallback() {
 function ResultsView() {
   const params = useSearchParams();
 
-  // Resolve which supported city pair to show from the typed cities.
-  const pair = useMemo(
-    () => getCityPair(params.get("from"), params.get("to")),
-    [params]
-  );
-  const from = pair.origin;
-  const to = pair.destination;
-  const neighborhood =
-    params.get("neighborhood") || pair.matches[0].familiar;
+  const fromParam = params.get("from");
+  const toParam = params.get("to");
+  const neighborhoodParam = params.get("neighborhood") || "";
 
   const metrics = useMemo<Preference[]>(() => {
     const raw = params.get("metrics");
@@ -64,12 +69,6 @@ function ResultsView() {
       .filter((m) => m.name);
   }, [params]);
 
-  // Re-score and re-rank this pair's matches against the user's priorities.
-  const ranked = useMemo(
-    () => rankMatches(pair.matches, metrics),
-    [pair, metrics]
-  );
-
   // Which factors the user actually prioritized (for highlighting).
   const prioritizedFactors = useMemo(() => {
     const set = new Set<string>();
@@ -80,11 +79,61 @@ function ResultsView() {
     return set;
   }, [metrics]);
 
-  const personalized = ranked.some((m) => m.personalized);
+  const [data, setData] = useState<MatchResponse | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const [selectedId, setSelectedId] = useState(ranked[0].id);
-  const selected = ranked.find((m) => m.id === selectedId) ?? ranked[0];
+  // Ask the backend to score + (if a key is set) write AI explanations.
+  useEffect(() => {
+    let cancelled = false;
+    setData(null);
+    setSelectedId(null);
+
+    async function run() {
+      const body = {
+        from: fromParam,
+        to: toParam,
+        neighborhood: neighborhoodParam,
+        preferences: metrics,
+      };
+      try {
+        const res = await fetch("/api/match", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(`bad status ${res.status}`);
+        const json = (await res.json()) as MatchResponse;
+        if (!cancelled) setData(json);
+      } catch {
+        // Backend unreachable — fall back to computing locally so the page never breaks.
+        const pair = getCityPair(fromParam, toParam);
+        if (!cancelled) {
+          setData({
+            from: pair.origin,
+            to: pair.destination,
+            neighborhood: neighborhoodParam || pair.matches[0].familiar,
+            center: pair.center,
+            zoom: pair.zoom,
+            matches: rankMatches(pair.matches, metrics),
+            aiGenerated: false,
+          });
+        }
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [fromParam, toParam, neighborhoodParam, metrics]);
+
+  if (!data) return <ResultsFallback />;
+
+  const { from, to, neighborhood } = data;
+  const ranked = data.matches;
+  const personalized = ranked.some((m) => m.personalized);
   const topId = ranked[0].id;
+  const selected = ranked.find((m) => m.id === selectedId) ?? ranked[0];
 
   return (
     <main className="min-h-screen">
@@ -173,6 +222,11 @@ function ResultsView() {
                 ? "Ranked and scored by your priorities. Tap a pin to see why."
                 : "Tap a pin on the map to see why it fits."}
             </p>
+            {data.aiGenerated && (
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-brand-purple">
+                ✨ Explanations by Claude
+              </span>
+            )}
           </div>
         </aside>
 
@@ -190,10 +244,10 @@ function ResultsView() {
           <div className="relative mt-2 min-h-[440px] w-full flex-1 overflow-hidden rounded-xl">
             <NeighborhoodMap
               matches={ranked}
-              selectedId={selectedId}
+              selectedId={selected.id}
               topId={topId}
-              center={pair.center}
-              zoom={pair.zoom}
+              center={data.center}
+              zoom={data.zoom}
               onSelect={setSelectedId}
             />
           </div>
