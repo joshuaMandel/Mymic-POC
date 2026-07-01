@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CityTypeahead from "@/components/CityTypeahead";
 import { usCities, LIVE_CITIES } from "@/lib/us-cities";
-import { neighborhoodsForOrigin } from "@/lib/neighborhoods";
+import { cityNames, neighborhoodsForOrigin } from "@/lib/neighborhoods";
 import type { ZipDetection } from "@/scripts/lib/zip-lookup.mjs";
 
 type Metric = { name: string; importance: number };
@@ -24,8 +24,11 @@ const IMPORTANCE_LABELS: Record<number, string> = {
 export default function MatchPage() {
   const router = useRouter();
 
-  const [origin, setOrigin] = useState("St. Louis, MO");
-  const [destination, setDestination] = useState("Denver, CO");
+  // Default to the first two live (ingested) cities — no hardcoded data.
+  const [origin, setOrigin] = useState(cityNames[0] ?? "");
+  const [destination, setDestination] = useState(
+    cityNames.find((c) => c !== cityNames[0]) ?? ""
+  );
   const neighborhoods = neighborhoodsForOrigin(origin);
   const [currentNeighborhood, setCurrentNeighborhood] = useState(
     neighborhoods[0] ?? ""

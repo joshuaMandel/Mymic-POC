@@ -102,6 +102,20 @@ export function resolveMatches(
   neighborhoodInput?: string | null,
   preferences: Preference[] = []
 ): ResolveResult {
+  // With no hand-curated fallback dataset, guard the (deploy-time) case where
+  // no data has been ingested yet: render an empty, clearly-unsupported result.
+  if (cityNames.length === 0) {
+    return {
+      from: fromInput?.trim() ?? "",
+      to: toInput?.trim() ?? "",
+      neighborhood: neighborhoodInput ?? "",
+      center: { lat: 39.5, lng: -98.35 },
+      zoom: 4,
+      matches: [],
+      supported: false,
+    };
+  }
+
   // The cities the user typed (may be any US city).
   const fromTyped = (fromInput && fromInput.trim()) || cityNames[0];
   const toTyped =
@@ -111,7 +125,7 @@ export function resolveMatches(
   const supported =
     cityNames.includes(fromTyped) && cityNames.includes(toTyped);
 
-  // The cities we actually compute against — fall back to seeded cities so an
+  // The cities we actually compute against — fall back to ingested cities so an
   // unsupported pick still shows a plausible preview instead of an empty page.
   const from = cityNames.includes(fromTyped) ? fromTyped : cityNames[0];
   let to = cityNames.includes(toTyped)

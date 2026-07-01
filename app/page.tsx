@@ -86,8 +86,10 @@ export default function LandingPage() {
             <div className="mt-4 flex items-center justify-between gap-3">
               <div className="flex-1 rounded-2xl border border-white/60 bg-white/70 p-4 text-center backdrop-blur">
                 <p className="text-xs font-medium text-brand-text/50">You know</p>
-                <p className="mt-1 text-lg font-bold text-brand-text">Kirkwood</p>
-                <p className="text-xs text-brand-text/50">St. Louis</p>
+                <p className="mt-1 text-lg font-bold text-brand-text">
+                  East Nashville
+                </p>
+                <p className="text-xs text-brand-text/50">Nashville</p>
               </div>
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-sheen text-white shadow-glow">
                 →
@@ -95,9 +97,9 @@ export default function LandingPage() {
               <div className="flex-1 rounded-2xl border border-brand-purple/20 bg-brand-purple/10 p-4 text-center backdrop-blur">
                 <p className="text-xs font-medium text-brand-text/50">Feels like</p>
                 <p className="mt-1 text-lg font-bold text-brand-purple">
-                  Wheat Ridge
+                  Pearl District
                 </p>
-                <p className="text-xs text-brand-text/50">Denver</p>
+                <p className="text-xs text-brand-text/50">Portland</p>
               </div>
             </div>
             <div className="mt-5 overflow-hidden rounded-2xl border border-white/60 bg-white/60 px-4 py-3 backdrop-blur">
