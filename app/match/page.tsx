@@ -7,7 +7,7 @@ import {
   originCityNames,
   destinationCityNames,
   neighborhoodsForOrigin,
-} from "@/lib/data";
+} from "@/lib/neighborhoods";
 
 type Metric = { name: string; importance: number };
 

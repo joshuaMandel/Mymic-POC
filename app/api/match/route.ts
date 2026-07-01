@@ -1,4 +1,5 @@
-import { getCityPair, rankMatches, type Preference } from "@/lib/data";
+import { type Preference } from "@/lib/data";
+import { resolveMatches } from "@/lib/match-engine";
 import { generateExplanations } from "@/lib/explain";
 
 // Needs the Node runtime for the Anthropic SDK; never cache (results are per-request).
@@ -11,16 +12,6 @@ type Body = {
   neighborhood?: string | null;
   preferences?: unknown;
 };
-
-// Health check — visit /api/match in a browser to confirm the deployment can
-// see the key. Returns a boolean only; never the key itself.
-export async function GET() {
-  return Response.json({
-    ok: true,
-    keyPresent: Boolean(process.env.ANTHROPIC_API_KEY),
-    model: "claude-haiku-4-5",
-  });
-}
 
 function parsePreferences(input: unknown): Preference[] {
   if (!Array.isArray(input)) return [];
@@ -45,48 +36,43 @@ export async function POST(req: Request) {
 
   const preferences = parsePreferences(body.preferences);
 
-  // Reuse the exact same engine the client used to run inline.
-  const pair = getCityPair(body.from ?? null, body.to ?? null);
-  const neighborhood =
-    typeof body.neighborhood === "string" && body.neighborhood
-      ? body.neighborhood
-      : pair.matches[0].familiar;
+  // Real vector-based similarity engine (works for any pair of cities we have data for).
+  const result = resolveMatches(
+    body.from ?? null,
+    body.to ?? null,
+    body.neighborhood ?? null,
+    preferences
+  );
 
-  const ranked = rankMatches(pair.matches, preferences);
-
-  let matches = ranked;
+  let matches = result.matches;
   let aiGenerated = false;
-  const keyPresent = Boolean(process.env.ANTHROPIC_API_KEY);
-  let aiError: string | undefined;
 
   // Only reach for Claude when a key is configured; otherwise keep templated copy.
-  if (keyPresent) {
+  if (process.env.ANTHROPIC_API_KEY) {
     try {
-      const explanations = await generateExplanations(pair, ranked, neighborhood);
-      matches = ranked.map((m) => ({
+      const explanations = await generateExplanations(
+        result.from,
+        result.to,
+        result.neighborhood,
+        result.matches
+      );
+      matches = result.matches.map((m) => ({
         ...m,
         explanation: explanations[m.id] ?? m.explanation,
       }));
       aiGenerated = true;
     } catch (err) {
       console.error("[/api/match] AI explanation generation failed:", err);
-      // Non-secret error summary for diagnostics (Anthropic errors don't contain the key).
-      aiError =
-        err instanceof Error
-          ? `${err.name}: ${err.message}`.slice(0, 300)
-          : String(err).slice(0, 300);
     }
   }
 
   return Response.json({
-    from: pair.origin,
-    to: pair.destination,
-    neighborhood,
-    center: pair.center,
-    zoom: pair.zoom,
+    from: result.from,
+    to: result.to,
+    neighborhood: result.neighborhood,
+    center: result.center,
+    zoom: result.zoom,
     matches,
     aiGenerated,
-    keyPresent,
-    aiError,
   });
 }

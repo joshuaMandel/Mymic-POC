@@ -27,23 +27,49 @@ re-rank the matches (see `rankMatches` in `lib/data.ts`), and each match is
 plotted at its real Denver coordinates on the map. The map tiles load from a
 public CDN, so the map needs an internet connection to render.
 
-## Supported city pairs
+## Matching engine & cities
 
-The `/match` city fields are pickers, and the pair you choose drives a
-different set of matches and a different map. Three demo pairs ship in
-`lib/data.ts` (`cityPairs`):
+Matching is a real **vector-based similarity engine** (`lib/match-engine.ts`), not
+hand-authored pairs. Every neighborhood is a normalized attribute vector
+(Walkability, Amenities, Schools, Nightlife, Outdoors) in `lib/neighborhoods.ts`.
+Given an origin city, destination city, home neighborhood, and weighted priorities,
+the engine:
 
-- **St. Louis, MO → Denver, CO** (e.g. Kirkwood → Wheat Ridge, 87)
-- **Chicago, IL → Austin, TX** (e.g. Wicker Park → East Austin, 86)
-- **San Francisco, CA → Seattle, WA** (e.g. The Mission → Capitol Hill, 85)
+- ranks the destination's neighborhoods by how well they score on **what you care
+  about** (weighted average of their attributes — so the priority sliders steer the
+  results), and
+- labels each with its closest **familiar** equivalent from your origin city
+  (nearest attribute vector).
 
-Adding another pair is just another entry in the `cityPairs` array.
+**Any city in the dataset can be an origin *or* a destination** — the `/match`
+pickers list them all. Seeded cities: St. Louis, Chicago, San Francisco, Denver,
+Austin, Seattle (5 neighborhoods each, both directions).
+
+### Scaling to real US cities
+
+`scripts/build-neighborhoods.mjs` ingests real **US Census (ACS)** data into the
+same `Neighborhood` schema so the engine can cover real cities nationwide:
+
+```bash
+# 1. free Census key: https://api.census.gov/data/key_signup.html
+export CENSUS_API_KEY=xxxx
+# 2. edit scripts/metros.json with the metros + ZIPs you want
+# 3. run it (Node 18+, needs network)
+node scripts/build-neighborhoods.mjs   # → data/neighborhoods.generated.json
+```
+
+The script is an honest **starter**: ACS supplies demographics/cost/education
+directly; walkability, amenities, nightlife, and outdoors are approximated and
+marked `TODO` in `toFactors()` — the one place to plug in richer free sources (EPA
+National Walkability Index, OpenStreetMap POI counts, NCES school data). Merge the
+generated JSON into `lib/neighborhoods.ts` to use it. See the file header for the
+full pipeline and limits.
 
 ## Backend API
 
 There's a real backend route handler at **`POST /api/match`** (`app/api/match/route.ts`).
-It runs the matching engine server-side (reusing `getCityPair` + `rankMatches` from
-`lib/data.ts`) and, when an Anthropic API key is configured, generates each match's
+It runs the matching engine server-side (`resolveMatches` from `lib/match-engine.ts`)
+and, when an Anthropic API key is configured, generates each match's
 "why it matches" explanation live with **Claude Haiku 4.5** (`lib/explain.ts`). The
 `/results` page calls this route; if it's unreachable it falls back to computing locally,
 so the page never breaks.

@@ -28,3 +28,6 @@ next-env.d.ts
 
 # visual QA output
 /screenshots
+
+# generated datasets
+/data
