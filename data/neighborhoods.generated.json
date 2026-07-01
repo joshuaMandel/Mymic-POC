@@ -1,1 +1,82 @@
-[]
+[
+  {
+    "id": "zcta-37203",
+    "city": "Nashville, TN",
+    "name": "ZIP 37203",
+    "coords": {
+      "lat": 36.149775,
+      "lng": -86.789146
+    },
+    "attrs": {
+      "Walkability": 100,
+      "Amenities": 100,
+      "Schools": 94,
+      "Nightlife": 100,
+      "Outdoors": 100
+    }
+  },
+  {
+    "id": "zcta-37206",
+    "city": "Nashville, TN",
+    "name": "ZIP 37206",
+    "coords": {
+      "lat": 36.179319,
+      "lng": -86.731083
+    },
+    "attrs": {
+      "Walkability": 13,
+      "Amenities": 9,
+      "Schools": 81,
+      "Nightlife": 9,
+      "Outdoors": 33
+    }
+  },
+  {
+    "id": "zcta-37215",
+    "city": "Nashville, TN",
+    "name": "ZIP 37215",
+    "coords": {
+      "lat": 36.081955,
+      "lng": -86.834904
+    },
+    "attrs": {
+      "Walkability": 0,
+      "Amenities": 0,
+      "Schools": 100,
+      "Nightlife": 0,
+      "Outdoors": 0
+    }
+  },
+  {
+    "id": "zcta-37207",
+    "city": "Nashville, TN",
+    "name": "ZIP 37207",
+    "coords": {
+      "lat": 36.232473,
+      "lng": -86.777342
+    },
+    "attrs": {
+      "Walkability": 2,
+      "Amenities": 0,
+      "Schools": 0,
+      "Nightlife": 0,
+      "Outdoors": 16
+    }
+  },
+  {
+    "id": "zcta-97209",
+    "city": "Portland, OR",
+    "name": "ZIP 97209",
+    "coords": {
+      "lat": 45.531124,
+      "lng": -122.683951
+    },
+    "attrs": {
+      "Walkability": 50,
+      "Amenities": 50,
+      "Schools": 50,
+      "Nightlife": 50,
+      "Outdoors": 50
+    }
+  }
+]
