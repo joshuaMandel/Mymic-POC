@@ -15,9 +15,12 @@ import {
   haversineKm,
   nearestNeighborhood,
   pickNearestPlaceName,
+  pickNearestCityName,
   cityLabelFromAddress,
+  matchableNear,
   resolveZipLocally,
   shapeNominatimResult,
+  shapeCentroidResult,
   MAX_MATCH_KM,
 } from "./lib/zip-lookup.mjs";
 
@@ -235,6 +238,109 @@ eq(
   null,
   "placeName: NaN coords skipped"
 );
+
+// --- pickNearestCityName (fallback city label from place nodes) ----------------
+eq(
+  pickNearestCityName(
+    [
+      // city ~9km away vs town ~0.1km away: town wins despite its 2km penalty
+      { lat: 45.45, lon: -122.68, tags: { place: "city", name: "Portland" } },
+      { lat: 45.53, lon: -122.681, tags: { place: "town", name: "Closerton" } },
+    ],
+    CENTER
+  ),
+  "Closerton",
+  "cityName: much-closer town beats the city"
+);
+eq(
+  pickNearestCityName(
+    [
+      { lat: 45.525, lon: -122.68, tags: { place: "city", name: "Portland" } },
+      { lat: 45.528, lon: -122.681, tags: { place: "town", name: "Tinyville" } },
+    ],
+    CENTER
+  ),
+  "Portland",
+  "cityName: city wins over a town at similar distance (penalty)"
+);
+eq(pickNearestCityName(null, CENTER), null, "cityName: null never throws");
+
+// --- matchableNear ---------------------------------------------------------------
+eq(
+  matchableNear({ lat: 38.585, lng: -90.405 }, "Kirkwood, MO", FIXTURE, KNOWN),
+  { city: "St. Louis, MO", neighborhood: "Kirkwood" },
+  "matchableNear: non-live city rescued by global nearest"
+);
+eq(
+  matchableNear({ lat: 44.0, lng: -103.5 }, null, FIXTURE, KNOWN),
+  null,
+  "matchableNear: far point → null"
+);
+
+// --- shapeCentroidResult (the resilient local-centroid path) -----------------------
+// (a) Everything available: Nominatim address wins for name + city.
+eq(
+  shapeCentroidResult(
+    "97209",
+    { lat: 45.5312, lng: -122.6819 },
+    { neighbourhood: "Pearl District", city: "Portland", state: "Oregon" },
+    null,
+    FIXTURE,
+    KNOWN
+  ),
+  {
+    zip: "97209",
+    detected: { name: "Pearl District", city: "Portland, OR" },
+    matchable: { city: "Portland, OR", neighborhood: "Pearl District" },
+    source: "centroid",
+  },
+  "centroid: Nominatim address path"
+);
+// (b) Nominatim blocked (null address): Overpass place nodes supply the labels,
+// matching still works from the centroid alone.
+eq(
+  shapeCentroidResult(
+    "97209",
+    { lat: 45.5312, lng: -122.6819 },
+    null,
+    [
+      { lat: 45.5348, lon: -122.6819, tags: { place: "neighbourhood", name: "Pearl District" } },
+      { lat: 45.52, lon: -122.68, tags: { place: "city", name: "Portland" } },
+    ],
+    FIXTURE,
+    KNOWN
+  ),
+  {
+    zip: "97209",
+    detected: { name: "Pearl District", city: "Portland, OR" },
+    matchable: { city: "Portland, OR", neighborhood: "Pearl District" },
+    source: "centroid",
+  },
+  "centroid: geocoder-blocked → Overpass labels, matchable from centroid"
+);
+// (c) EVERYTHING external down: matching still works; labels degrade gracefully.
+eq(
+  shapeCentroidResult("97209", { lat: 45.5312, lng: -122.6819 }, null, null, FIXTURE, KNOWN),
+  {
+    zip: "97209",
+    detected: { name: "Pearl District", city: "Portland, OR" },
+    matchable: { city: "Portland, OR", neighborhood: "Pearl District" },
+    source: "centroid",
+  },
+  "centroid: all geocoders down → still matchable (labels from the match)"
+);
+// (d) Remote ZIP, no geocoders: honest ZIP-labeled preview.
+eq(
+  shapeCentroidResult("57701", { lat: 44.0, lng: -103.5 }, null, null, FIXTURE, KNOWN),
+  {
+    zip: "57701",
+    detected: { name: "ZIP 57701", city: "ZIP 57701" },
+    matchable: null,
+    source: "centroid",
+  },
+  "centroid: remote ZIP with nothing external → preview"
+);
+eq(shapeCentroidResult("97209", null, null, null, FIXTURE, KNOWN), null, "centroid: null point → null");
 
 // Sanity: MAX_MATCH_KM is a sane rescue radius.
 eq(MAX_MATCH_KM > 5 && MAX_MATCH_KM < 100, true, "MAX_MATCH_KM in a sane range");

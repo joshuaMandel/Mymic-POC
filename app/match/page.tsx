@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CityTypeahead from "@/components/CityTypeahead";
-import { usCities, LIVE_CITIES } from "@/lib/us-cities";
 import { cityNames, neighborhoodsForOrigin } from "@/lib/neighborhoods";
 import type { ZipDetection } from "@/scripts/lib/zip-lookup.mjs";
 
@@ -165,16 +164,12 @@ export default function MatchPage() {
                 label="Current city"
                 value={origin}
                 onChange={selectOrigin}
-                options={usCities}
-                liveSet={LIVE_CITIES}
                 placeholder="City name… or your 5-digit ZIP"
               />
               <CityTypeahead
                 label="Destination city"
                 value={destination}
                 onChange={setDestination}
-                options={usCities}
-                liveSet={LIVE_CITIES}
                 placeholder="Search any US city…"
               />
               {zipStatus !== "idle" && (

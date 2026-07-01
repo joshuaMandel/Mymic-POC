@@ -119,10 +119,16 @@ The "Current city" field on `/match` is a **smart field**: type a city name *or*
 &lt;neighborhood&gt;, &lt;City, ST&gt;" and an engine-ready origin:
 
 1. **Data path** — ZIPs already ingested (`id: "zcta-<zip>"`) resolve instantly, offline.
-2. **Live path** — otherwise OpenStreetMap **Nominatim** (postal-code search +
-   reverse geocode), then the nearest known neighborhood by distance; suburbs
-   within 30 km of a dataset city are matched to it (e.g. 63122 "Kirkwood, MO" →
-   St. Louis's Kirkwood).
+2. **Centroid path** — any other US ZIP resolves against the local Census
+   centroid table (`data/zip-centroids.generated.json`, ~33k ZIPs, built by the
+   ingestion Action). The core matching (nearest known neighborhood, 30 km
+   suburb rescue) needs **no external service**; Nominatim/Overpass are only
+   consulted to prettify the display label and degrade harmlessly if blocked.
+3. **Search path** — ZIPs missing from the gazetteer fall back to a Nominatim
+   postal-code search.
+
+City suggestions come from **`GET /api/cities?q=…`** — the ~32k-city list lives
+server-side only (it used to ship ~150kB of JSON to every browser).
 
 ```jsonc
 // → 200 (always; branch on `ok`)
