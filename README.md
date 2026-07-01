@@ -84,10 +84,12 @@ All sources are **free**. Real signals per ZIP:
 - **Walkability** → total POI density (proxy; EPA National Walkability Index is the
   gold-standard `TODO`).
 - **Schools** → Census ACS education share (proxy; NCES/GreatSchools is the `TODO`).
+- **Neighborhood name** → **OpenStreetMap Nominatim** reverse-geocode of the ZIP
+  centroid (e.g. `97209 → Pearl District`); falls back to `ZIP <code>` on a miss.
+  The name-picker is pure and unit-tested offline: `npm test`.
 
 Each metric is normalized within its metro, then written in the `Neighborhood` shape.
-Remaining `TODO`s (EPA walkability, real school ratings, a neighborhood-name gazetteer)
-are marked in the script. The generated JSON is merged automatically by
+Remaining `TODO`s (EPA walkability, real school ratings) are marked in the script. The generated JSON is merged automatically by
 `lib/neighborhoods.ts` — seed cities keep their curated names, ingested cities only get
 *added*. Overpass is rate-limited, so the script is paced — run a handful of metros at a time.
 
