@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import type { CityPair, ScoredMatch } from "./data";
+import type { ScoredMatch } from "./data";
 
 // Fast + cheap model for short, on-demand copy. ($1 / $5 per 1M tokens.)
 const MODEL = "claude-haiku-4-5";
@@ -37,14 +37,13 @@ const OUTPUT_FORMAT = {
 const cache = new Map<string, Record<string, string>>();
 
 function signature(
-  pair: CityPair,
+  from: string,
+  to: string,
   neighborhood: string,
   matches: ScoredMatch[]
 ): string {
-  const parts = matches
-    .map((m) => `${m.id}:${m.personalizedScore}`)
-    .join("|");
-  return `${pair.origin}>${pair.destination}#${neighborhood}#${parts}`;
+  const parts = matches.map((m) => `${m.id}:${m.personalizedScore}`).join("|");
+  return `${from}>${to}#${neighborhood}#${parts}`;
 }
 
 /**
@@ -54,11 +53,12 @@ function signature(
  * to the templated explanations already on each match).
  */
 export async function generateExplanations(
-  pair: CityPair,
-  matches: ScoredMatch[],
-  neighborhood: string
+  from: string,
+  to: string,
+  neighborhood: string,
+  matches: ScoredMatch[]
 ): Promise<Record<string, string>> {
-  const key = signature(pair, neighborhood, matches);
+  const key = signature(from, to, neighborhood, matches);
   const cached = cache.get(key);
   if (cached) return cached;
 
@@ -84,8 +84,8 @@ export async function generateExplanations(
   }));
 
   const user =
-    `Origin city: ${pair.origin}\n` +
-    `Destination city: ${pair.destination}\n` +
+    `Origin city: ${from}\n` +
+    `Destination city: ${to}\n` +
     `The person's home neighborhood: ${neighborhood}\n\n` +
     `Write an explanation for each match below:\n` +
     JSON.stringify(items, null, 2);

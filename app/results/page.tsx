@@ -6,12 +6,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import {
-  rankMatches,
   preferenceToFactor,
-  getCityPair,
   type ScoredMatch,
   type Preference,
 } from "@/lib/data";
+import { resolveMatches } from "@/lib/match-engine";
 
 // Shape returned by POST /api/match (scoring + optional AI-generated explanations).
 type MatchResponse = {
@@ -105,16 +104,16 @@ function ResultsView() {
         const json = (await res.json()) as MatchResponse;
         if (!cancelled) setData(json);
       } catch {
-        // Backend unreachable — fall back to computing locally so the page never breaks.
-        const pair = getCityPair(fromParam, toParam);
+        // Backend unreachable — compute locally with the same engine so the page never breaks.
+        const r = resolveMatches(fromParam, toParam, neighborhoodParam, metrics);
         if (!cancelled) {
           setData({
-            from: pair.origin,
-            to: pair.destination,
-            neighborhood: neighborhoodParam || pair.matches[0].familiar,
-            center: pair.center,
-            zoom: pair.zoom,
-            matches: rankMatches(pair.matches, metrics),
+            from: r.from,
+            to: r.to,
+            neighborhood: r.neighborhood,
+            center: r.center,
+            zoom: r.zoom,
+            matches: r.matches,
             aiGenerated: false,
           });
         }
