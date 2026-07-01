@@ -39,6 +39,40 @@ different set of matches and a different map. Three demo pairs ship in
 
 Adding another pair is just another entry in the `cityPairs` array.
 
+## Backend API
+
+There's a real backend route handler at **`POST /api/match`** (`app/api/match/route.ts`).
+It runs the matching engine server-side (reusing `getCityPair` + `rankMatches` from
+`lib/data.ts`) and, when an Anthropic API key is configured, generates each match's
+"why it matches" explanation live with **Claude Haiku 4.5** (`lib/explain.ts`). The
+`/results` page calls this route; if it's unreachable it falls back to computing locally,
+so the page never breaks.
+
+**Request/response:**
+
+```jsonc
+// POST /api/match
+{ "from": "St. Louis, MO", "to": "Denver, CO", "neighborhood": "Kirkwood",
+  "preferences": [{ "name": "Outdoors", "importance": 4 }] }
+
+// → 200
+{ "from": "...", "to": "...", "neighborhood": "...",
+  "center": { "lat": 39.73, "lng": -104.99 }, "zoom": 11,
+  "matches": [ /* ScoredMatch[] */ ], "aiGenerated": true }
+```
+
+### Enabling AI explanations
+
+The app works with **no key** (templated explanations, `aiGenerated: false`). To turn on
+Claude-generated explanations:
+
+1. **Create a key:** [platform.claude.com](https://platform.claude.com) → **API keys** → **Create key** (`sk-ant-…`).
+2. **Local:** copy `.env.local.example` to `.env.local` and set `ANTHROPIC_API_KEY=sk-ant-…`, then restart `npm run dev`.
+3. **Vercel (production):** Project → **Settings → Environment Variables** → add `ANTHROPIC_API_KEY` for Production (and Preview) → redeploy.
+
+The key is read server-side only in the route handler — it is never shipped to the browser.
+Haiku 4.5 is ~$1/$5 per million tokens; one batched call per search costs a fraction of a cent.
+
 ## Run it locally
 
 Requires **Node.js 18.18+** (or 20+).
