@@ -268,7 +268,18 @@ async function main() {
     for (const zip of metro.zips) {
       const prior = existing.get(zip);
       if (prior) {
-        raw.push({ zip, coords: prior.coords, name: prior.rawName ?? null, ...prior.raw });
+        let name = prior.rawName ?? null;
+        // SELF-HEALING NAMES: a missing name is usually a transient Overpass
+        // failure, not a real map gap (Pearl District once came back null!).
+        // Reuse the expensive POI counts but cheaply retry just the name
+        // lookup on every run until one sticks.
+        if (name === null && fetches < MAX_FETCHES) {
+          fetches++;
+          name = await fetchPlaceName(prior.coords.lat, prior.coords.lng, [cityOnly]);
+          if (name) console.log(`  ZIP ${zip}: name retry → ${name}`);
+          await sleep(1200);
+        }
+        raw.push({ zip, coords: prior.coords, name, ...prior.raw });
         continue;
       }
       if (fetches >= MAX_FETCHES) {
