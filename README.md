@@ -45,12 +45,13 @@ the engine:
 city fields are a **type-ahead over US cities** (`components/CityTypeahead.tsx`,
 list in `lib/us-cities.ts`) — cities with real neighborhood data are marked
 **● live**; picking a not-yet-ingested city shows a labeled "Preview" result set
-rather than breaking. Seeded live cities: St. Louis, Chicago, San Francisco,
-Denver, Austin, Seattle (5 neighborhoods each, both directions).
+rather than breaking.
 
-To populate the type-ahead with **every** US city, run
-`scripts/build-us-cities.mjs` against the free Census "Places" gazetteer (~19k
-entries) and merge its output into `lib/us-cities.ts` (see the file header).
+**There is no hand-written data anywhere.** Every neighborhood record comes from
+the ingestion pipeline (Census ACS + OpenStreetMap → `data/neighborhoods.generated.json`)
+and the type-ahead list is the full Census Places gazetteer
+(`data/us-cities.generated.json`, ~32k cities). Live cities = whatever
+`scripts/metros.json` has been ingested.
 
 ### Scaling to real US cities
 
@@ -89,9 +90,9 @@ All sources are **free**. Real signals per ZIP:
   The name-picker is pure and unit-tested offline: `npm test`.
 
 Each metric is normalized within its metro, then written in the `Neighborhood` shape.
-Remaining `TODO`s (EPA walkability, real school ratings) are marked in the script. The generated JSON is merged automatically by
-`lib/neighborhoods.ts` — seed cities keep their curated names, ingested cities only get
-*added*. Overpass is rate-limited, so the script is paced — run a handful of metros at a time.
+Remaining `TODO`s (EPA walkability, real school ratings) are marked in the script.
+`lib/neighborhoods.ts` loads the generated JSON directly — it *is* the dataset.
+Overpass is rate-limited, so the script is paced — run a handful of metros at a time.
 
 ## Backend API
 
