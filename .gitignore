@@ -33,3 +33,4 @@ next-env.d.ts
 /data/*
 !/data/us-cities.generated.json
 !/data/neighborhoods.generated.json
+!/data/metros.generated.json

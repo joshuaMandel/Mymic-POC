@@ -53,30 +53,27 @@ and the type-ahead list is the full Census Places gazetteer
 (`data/us-cities.generated.json`, ~32k cities). Live cities = whatever
 `scripts/metros.json` has been ingested.
 
-### Scaling to real US cities
+### The data pipeline — 100% API-derived
 
-`scripts/build-neighborhoods.mjs` ingests real **US Census (ACS)** data into the
-same `Neighborhood` schema so the engine can cover real cities nationwide. The app
-auto-merges `data/neighborhoods.generated.json` and `data/us-cities.generated.json`
-on the next deploy, so you never edit `lib/` by hand.
+**Nothing is hand-picked** — not the cities, not the ZIP codes, not the metrics.
+The GitHub Action (`.github/workflows/ingest-data.yml`) runs three stages and
+commits the results back (which triggers a fresh Vercel deploy):
 
-**Recommended — run it on GitHub (no local setup):** a workflow
-(`.github/workflows/ingest-data.yml`) runs the whole ingestion on GitHub's servers and
-commits the generated data back to the repo, which triggers a fresh Vercel deploy.
+1. **`build-metros.mjs`** — selects the **top N US cities by Census population**
+   (ACS API) and each city's **most-populated ZIP codes** (Census ZCTA↔Place
+   relationship file + ACS ZCTA populations) → `data/metros.generated.json`.
+2. **`build-us-cities.mjs`** — the full Census Places gazetteer (~32k cities)
+   for the type-ahead → `data/us-cities.generated.json`.
+3. **`build-neighborhoods.mjs`** — per ZIP: Census ACS + OpenStreetMap metrics
+   and a real neighborhood name → `data/neighborhoods.generated.json`.
+   **Resumable**: raw API counts are stored per record, so each run fetches at
+   most `MAX_FETCHES` new ZIPs and the **weekly cron** tops up coverage until
+   every selected metro is complete.
 
-1. Get a free Census key: <https://api.census.gov/data/key_signup.html> (instant, emailed).
-2. Add it as a repo secret: **Settings → Secrets and variables → Actions → New
-   repository secret** → name `CENSUS_API_KEY`, paste the key.
-3. Edit `scripts/metros.json` with the metros + ZIPs you want to add.
-4. Run it: **Actions tab → "Ingest neighborhood data" → Run workflow**.
-
-**Alternative — run it locally** (Node 18+, needs network):
-
-```bash
-export CENSUS_API_KEY=xxxx                # same free key as above
-node scripts/build-us-cities.mjs          # → data/us-cities.generated.json
-node scripts/build-neighborhoods.mjs      # → data/neighborhoods.generated.json
-```
+Setup (once): get a free Census key (<https://api.census.gov/data/key_signup.html>)
+and add it as the repo secret `CENSUS_API_KEY`. Then **Actions → "Ingest
+neighborhood data" → Run workflow** (inputs: `top_cities`, `zips_per_metro`,
+`max_fetches`).
 
 All sources are **free**. Real signals per ZIP:
 
@@ -85,14 +82,13 @@ All sources are **free**. Real signals per ZIP:
 - **Walkability** → total POI density (proxy; EPA National Walkability Index is the
   gold-standard `TODO`).
 - **Schools** → Census ACS education share (proxy; NCES/GreatSchools is the `TODO`).
-- **Neighborhood name** → **OpenStreetMap Nominatim** reverse-geocode of the ZIP
-  centroid (e.g. `97209 → Pearl District`); falls back to `ZIP <code>` on a miss.
-  The name-picker is pure and unit-tested offline: `npm test`.
+- **Neighborhood name** → nearest **OpenStreetMap place node**
+  (neighbourhood/quarter/suburb) via Overpass (e.g. `97209 → Pearl District`);
+  falls back to `ZIP <code>` on a miss. Pure + unit-tested offline: `npm test`.
 
 Each metric is normalized within its metro, then written in the `Neighborhood` shape.
 Remaining `TODO`s (EPA walkability, real school ratings) are marked in the script.
 `lib/neighborhoods.ts` loads the generated JSON directly — it *is* the dataset.
-Overpass is rate-limited, so the script is paced — run a handful of metros at a time.
 
 ## Backend API
 
