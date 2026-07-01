@@ -8,27 +8,27 @@
       "lng": -86.789146
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 0,
+      "Amenities": 0,
       "Schools": 94,
       "Nightlife": 50,
-      "Outdoors": 50
+      "Outdoors": 0
     }
   },
   {
     "id": "zcta-37206",
     "city": "Nashville, TN",
-    "name": "ZIP 37206",
+    "name": "Rosebank",
     "coords": {
       "lat": 36.179319,
       "lng": -86.731083
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 0,
+      "Amenities": 0,
       "Schools": 81,
       "Nightlife": 50,
-      "Outdoors": 50
+      "Outdoors": 0
     }
   },
   {
@@ -40,11 +40,11 @@
       "lng": -86.801688
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 0,
+      "Amenities": 0,
       "Schools": 97,
       "Nightlife": 50,
-      "Outdoors": 50
+      "Outdoors": 0
     }
   },
   {
@@ -56,11 +56,11 @@
       "lng": -86.834904
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 14,
+      "Amenities": 0,
       "Schools": 100,
       "Nightlife": 50,
-      "Outdoors": 50
+      "Outdoors": 33
     }
   },
   {
@@ -72,11 +72,11 @@
       "lng": -86.777342
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 25,
+      "Amenities": 0,
       "Schools": 0,
       "Nightlife": 50,
-      "Outdoors": 50
+      "Outdoors": 58
     }
   },
   {
@@ -88,11 +88,11 @@
       "lng": -86.959839
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 18,
+      "Amenities": 0,
       "Schools": 54,
       "Nightlife": 50,
-      "Outdoors": 50
+      "Outdoors": 42
     }
   },
   {
@@ -104,43 +104,43 @@
       "lng": -86.723419
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 100,
+      "Amenities": 100,
       "Schools": 37,
       "Nightlife": 50,
-      "Outdoors": 50
+      "Outdoors": 100
     }
   },
   {
     "id": "zcta-97201",
     "city": "Portland, OR",
-    "name": "ZIP 97201",
+    "name": "University District",
     "coords": {
       "lat": 45.508551,
       "lng": -122.688283
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 66,
+      "Amenities": 53,
       "Schools": 0,
-      "Nightlife": 50,
-      "Outdoors": 50
+      "Nightlife": 27,
+      "Outdoors": 100
     }
   },
   {
     "id": "zcta-97202",
     "city": "Portland, OR",
-    "name": "ZIP 97202",
+    "name": "Westmoreland",
     "coords": {
       "lat": 45.482012,
       "lng": -122.644451
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 12,
+      "Amenities": 10,
       "Schools": 3,
-      "Nightlife": 50,
-      "Outdoors": 50
+      "Nightlife": 15,
+      "Outdoors": 16
     }
   },
   {
@@ -152,27 +152,27 @@
       "lng": -122.683951
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 100,
+      "Amenities": 100,
       "Schools": 19,
-      "Nightlife": 50,
-      "Outdoors": 50
+      "Nightlife": 100,
+      "Outdoors": 26
     }
   },
   {
     "id": "zcta-97210",
     "city": "Portland, OR",
-    "name": "ZIP 97210",
+    "name": "Forest Park",
     "coords": {
       "lat": 45.545484,
       "lng": -122.736853
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 0,
+      "Amenities": 0,
       "Schools": 23,
-      "Nightlife": 50,
-      "Outdoors": 50
+      "Nightlife": 0,
+      "Outdoors": 6
     }
   },
   {
@@ -184,11 +184,11 @@
       "lng": -122.644031
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 71,
+      "Amenities": 73,
       "Schools": 100,
-      "Nightlife": 50,
-      "Outdoors": 50
+      "Nightlife": 93,
+      "Outdoors": 0
     }
   },
   {
@@ -200,27 +200,27 @@
       "lng": -122.695414
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 6,
+      "Amenities": 2,
       "Schools": 44,
-      "Nightlife": 50,
-      "Outdoors": 50
+      "Nightlife": 0,
+      "Outdoors": 28
     }
   },
   {
     "id": "zcta-97213",
     "city": "Portland, OR",
-    "name": "ZIP 97213",
+    "name": "Rose City Park",
     "coords": {
       "lat": 45.538194,
       "lng": -122.600014
     },
     "attrs": {
-      "Walkability": 50,
-      "Amenities": 50,
+      "Walkability": 18,
+      "Amenities": 19,
       "Schools": 16,
-      "Nightlife": 50,
-      "Outdoors": 50
+      "Nightlife": 16,
+      "Outdoors": 3
     }
   }
 ]
