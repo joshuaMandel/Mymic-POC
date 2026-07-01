@@ -3,11 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
-import {
-  originCityNames,
-  destinationCityNames,
-  neighborhoodsForOrigin,
-} from "@/lib/neighborhoods";
+import CityTypeahead from "@/components/CityTypeahead";
+import { usCities, LIVE_CITIES } from "@/lib/us-cities";
+import { neighborhoodsForOrigin } from "@/lib/neighborhoods";
 
 type Metric = { name: string; importance: number };
 
@@ -21,11 +19,11 @@ const IMPORTANCE_LABELS: Record<number, string> = {
 export default function MatchPage() {
   const router = useRouter();
 
-  const [origin, setOrigin] = useState(originCityNames[0]);
-  const [destination, setDestination] = useState(destinationCityNames[0]);
+  const [origin, setOrigin] = useState("St. Louis, MO");
+  const [destination, setDestination] = useState("Denver, CO");
   const neighborhoods = neighborhoodsForOrigin(origin);
   const [currentNeighborhood, setCurrentNeighborhood] = useState(
-    neighborhoods[0]
+    neighborhoods[0] ?? ""
   );
 
   const [metrics, setMetrics] = useState<Metric[]>([
@@ -37,8 +35,8 @@ export default function MatchPage() {
 
   function selectOrigin(next: string) {
     setOrigin(next);
-    // Reset to a neighborhood that exists in the new origin city.
-    setCurrentNeighborhood(neighborhoodsForOrigin(next)[0]);
+    // Reset to a neighborhood that exists in the new origin city (if it's live).
+    setCurrentNeighborhood(neighborhoodsForOrigin(next)[0] ?? "");
   }
 
   function updateMetric(index: number, patch: Partial<Metric>) {
@@ -91,55 +89,63 @@ export default function MatchPage() {
               <h2 className="text-lg font-bold text-brand-text">
                 Relocation details
               </h2>
-              <span className="rounded-full bg-brand-purple/10 px-2.5 py-1 text-[11px] font-semibold text-brand-purple">
-                Mix &amp; match
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-green/10 px-2.5 py-1 text-[11px] font-semibold text-brand-green">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand-green" />
+                live = real data
               </span>
             </div>
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
-              <Field label="Current city">
-                <select
-                  value={origin}
-                  onChange={(e) => selectOrigin(e.target.value)}
-                  className="input"
-                >
-                  {originCityNames.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Destination city">
-                <select
-                  value={destination}
-                  onChange={(e) => setDestination(e.target.value)}
-                  className="input"
-                >
-                  {destinationCityNames.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              <CityTypeahead
+                label="Current city"
+                value={origin}
+                onChange={selectOrigin}
+                options={usCities}
+                liveSet={LIVE_CITIES}
+                placeholder="Search any US city…"
+              />
+              <CityTypeahead
+                label="Destination city"
+                value={destination}
+                onChange={setDestination}
+                options={usCities}
+                liveSet={LIVE_CITIES}
+                placeholder="Search any US city…"
+              />
               <div className="sm:col-span-2">
-                <Field label="Current neighborhood">
-                  <select
-                    value={currentNeighborhood}
-                    onChange={(e) => setCurrentNeighborhood(e.target.value)}
-                    className="input"
-                  >
-                    {neighborhoods.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <p className="mt-2 text-xs text-brand-text/50">
-                  Pick the {origin.split(",")[0]} neighborhood you know best —
-                  we&apos;ll find its match in {destination.split(",")[0]}.
-                </p>
+                {neighborhoods.length > 0 ? (
+                  <>
+                    <label className="block">
+                      <span className="mb-1.5 block text-sm font-semibold text-brand-text">
+                        Current neighborhood
+                      </span>
+                      <select
+                        value={currentNeighborhood}
+                        onChange={(e) => setCurrentNeighborhood(e.target.value)}
+                        className="input"
+                      >
+                        {neighborhoods.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <p className="mt-2 text-xs text-brand-text/50">
+                      Pick the {origin.split(",")[0]} neighborhood you know best —
+                      we&apos;ll find its match in {destination.split(",")[0]}.
+                    </p>
+                  </>
+                ) : (
+                  <p className="rounded-xl border border-white/50 bg-white/40 px-3.5 py-2.5 text-xs text-brand-text/60 backdrop-blur">
+                    Neighborhood-level data for{" "}
+                    <span className="font-semibold text-brand-text">
+                      {origin.split(",")[0]}
+                    </span>{" "}
+                    is rolling out. Pick a city marked{" "}
+                    <span className="font-semibold text-brand-green">● live</span>{" "}
+                    for full matches, or continue for a preview.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -200,22 +206,5 @@ export default function MatchPage() {
         </form>
       </section>
     </main>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-brand-text">
-        {label}
-      </span>
-      {children}
-    </label>
   );
 }

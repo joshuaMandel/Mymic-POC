@@ -22,6 +22,8 @@ export type ResolveResult = {
   center: { lat: number; lng: number };
   zoom: number;
   matches: ScoredMatch[];
+  /** true only when both cities have real neighborhood data (else it's a preview) */
+  supported: boolean;
 };
 
 // Importance weight per factor, summed across the user's priorities.
@@ -100,11 +102,20 @@ export function resolveMatches(
   neighborhoodInput?: string | null,
   preferences: Preference[] = []
 ): ResolveResult {
-  const from = cityNames.includes(fromInput ?? "")
-    ? (fromInput as string)
-    : cityNames[0];
-  let to = cityNames.includes(toInput ?? "")
-    ? (toInput as string)
+  // The cities the user typed (may be any US city).
+  const fromTyped = (fromInput && fromInput.trim()) || cityNames[0];
+  const toTyped =
+    (toInput && toInput.trim()) ||
+    cityNames.find((c) => c !== fromTyped) ||
+    cityNames[0];
+  const supported =
+    cityNames.includes(fromTyped) && cityNames.includes(toTyped);
+
+  // The cities we actually compute against — fall back to seeded cities so an
+  // unsupported pick still shows a plausible preview instead of an empty page.
+  const from = cityNames.includes(fromTyped) ? fromTyped : cityNames[0];
+  let to = cityNames.includes(toTyped)
+    ? toTyped
     : cityNames.find((c) => c !== from) ?? cityNames[0];
   if (to === from) to = cityNames.find((c) => c !== from) ?? to;
 
@@ -158,5 +169,13 @@ export function resolveMatches(
   });
 
   const meta = cityMeta(to);
-  return { from, to, neighborhood, center: meta.center, zoom: meta.zoom, matches };
+  return {
+    from: fromTyped,
+    to: toTyped,
+    neighborhood,
+    center: meta.center,
+    zoom: meta.zoom,
+    matches,
+    supported,
+  };
 }

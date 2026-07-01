@@ -21,6 +21,7 @@ type MatchResponse = {
   zoom: number;
   matches: ScoredMatch[];
   aiGenerated: boolean;
+  supported: boolean;
 };
 
 // Leaflet touches `window`, so load the map only in the browser.
@@ -115,6 +116,7 @@ function ResultsView() {
             zoom: r.zoom,
             matches: r.matches,
             aiGenerated: false,
+            supported: r.supported,
           });
         }
       }
@@ -147,6 +149,19 @@ function ResultsView() {
           </Link>
         </div>
       </header>
+
+      {!data.supported && (
+        <div className="mx-auto max-w-7xl px-6 pt-6">
+          <div className="rounded-2xl border border-brand-purple/20 bg-brand-purple/5 px-5 py-3 text-sm text-brand-text/70 backdrop-blur">
+            <span className="font-semibold text-brand-purple">Preview</span> —
+            we&apos;re still gathering real neighborhood data for{" "}
+            <span className="font-semibold text-brand-text">{to}</span>. Here&apos;s
+            a sample match set; pick a city marked{" "}
+            <span className="font-semibold text-brand-green">● live</span> for full
+            results.
+          </div>
+        </div>
+      )}
 
       <div className="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-[260px_1fr_340px]">
         {/* Left sidebar — inputs summary */}
