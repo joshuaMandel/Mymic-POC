@@ -9,6 +9,8 @@
  *       • Outdoors   = parks + gardens + nature reserves + natural features
  *       • Walkability = total POI density (proxy; EPA index is the gold standard)
  *   - US Census ACS 5-year → Schools proxy (share of adults with a bachelor's+).
+ *   - OpenStreetMap via Nominatim → reverse-geocode each ZIP centroid to a real
+ *       neighborhood name (e.g. "Pearl District"); falls back to "ZIP <code>".
  *   Each metric is normalized to 0-100 WITHIN its metro so cities are comparable,
  *   then written to data/neighborhoods.generated.json in the exact shape of
  *   lib/neighborhoods.ts `Neighborhood[]`.
@@ -16,8 +18,6 @@
  * STILL TODO for full production quality (documented, not hidden):
  *   - Walkability → EPA National Walkability Index (per block group).
  *   - Schools     → GreatSchools API (paid) or NCES test scores (finer than education).
- *   - Names       → neighborhood-name gazetteer (OSM / Who's On First); we label
- *                   by "ZIP <code>" until that layer is added.
  *
  * USAGE:
  *   1. Free Census key: https://api.census.gov/data/key_signup.html → export CENSUS_API_KEY=xxxx
@@ -33,6 +33,7 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { pickPlaceName, dedupeName } from "./lib/place-name.mjs";
 
 const YEAR = 2022;
 const KEY = process.env.CENSUS_API_KEY;
@@ -49,6 +50,9 @@ const OVERPASS_ENDPOINTS = [
   "https://overpass.osm.ch/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
 ];
+// Nominatim reverse-geocodes a ZIP centroid into a real neighborhood name.
+// Free, but the usage policy caps us at ≤1 req/sec with an identifying UA.
+const NOMINATIM = "https://nominatim.openstreetmap.org/reverse";
 const RADIUS_M = 1609; // ~1 mile around each ZCTA centroid
 const UA = "MyMik-POC/1.0 (neighborhood ingestion; contact: you@example.com)";
 // The Census ZCTA gazetteer ships as a .zip — download + unzip it to this path.
@@ -149,6 +153,30 @@ async function fetchOsmCounts(lat, lng, attempt = 0) {
   throw new Error("Overpass unavailable on all mirrors after retries");
 }
 
+// --- OpenStreetMap: reverse-geocode a centroid to a neighborhood name -------
+// Returns the Nominatim `address` object, or null on any failure (the caller
+// falls back to "ZIP <code>", so a geocode miss never breaks ingestion).
+async function reverseGeocodeAddress(lat, lng) {
+  const url =
+    `${NOMINATIM}?format=jsonv2&lat=${lat}&lon=${lng}` +
+    `&zoom=14&addressdetails=1`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 15_000);
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, "Accept-Language": "en" },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.address ?? null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 // Min-max normalize a metric across the metro to 0-100 (null-safe).
 function normalizer(values) {
   const nums = values.filter((v) => v != null);
@@ -177,6 +205,8 @@ async function main() {
   for (const metro of metros) {
     console.log(`\n${metro.city} — education (ACS)…`);
     const edu = await fetchEducation(metro.zips);
+    // The metro's own city name, so we don't label a ZIP "Portland" in Portland.
+    const cityOnly = metro.city.split(",")[0].trim();
 
     const raw = [];
     for (const zip of metro.zips) {
@@ -188,12 +218,17 @@ async function main() {
       process.stdout.write(`  ZIP ${zip}: OSM POIs… `);
       try {
         const osm = await fetchOsmCounts(c.lat, c.lng);
-        console.log(`amen ${osm.amenities}, night ${osm.nightlife}, out ${osm.outdoors}`);
-        raw.push({ zip, coords: c, eduPct: edu.get(zip) ?? null, ...osm });
+        process.stdout.write(`amen ${osm.amenities}, night ${osm.nightlife}, out ${osm.outdoors}`);
+        // Reverse-geocode the centroid to a real neighborhood name.
+        const addr = await reverseGeocodeAddress(c.lat, c.lng);
+        const name = pickPlaceName(addr, { exclude: [cityOnly] });
+        console.log(name ? ` → ${name}` : ` → (no name)`);
+        raw.push({ zip, coords: c, eduPct: edu.get(zip) ?? null, name, ...osm });
       } catch (err) {
         console.log(`failed (${err.message})`);
       }
-      await sleep(1200); // be polite to Overpass
+      // Pace for both Overpass and Nominatim (≤1 req/sec) politeness.
+      await sleep(1200);
     }
 
     const norm = {
@@ -203,11 +238,15 @@ async function main() {
       outdoors: normalizer(raw.map((r) => r.outdoors)),
       edu: normalizer(raw.map((r) => r.eduPct)),
     };
+    const used = new Set(); // keep neighborhood labels unique within the metro
     for (const r of raw) {
+      const label = r.name
+        ? dedupeName(r.name, r.zip, used)
+        : `ZIP ${r.zip}`; // fallback when reverse-geocode found nothing
       out.push({
-        id: `zcta-${r.zip}`,
+        id: `zcta-${r.zip}`, // stable id (ZIP) even though the display name is now real
         city: metro.city,
-        name: `ZIP ${r.zip}`, // TODO: neighborhood-name gazetteer
+        name: label,
         coords: r.coords,
         attrs: toFactors(r, norm),
       });
