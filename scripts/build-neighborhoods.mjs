@@ -41,7 +41,14 @@ if (!KEY) {
   process.exit(1);
 }
 
-const OVERPASS = "https://overpass-api.de/api/interpreter";
+// Overpass mirrors — rotate across them when one rejects (406/429/5xx) so a
+// single overloaded endpoint doesn't drop half the ZIPs.
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.osm.ch/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
 const RADIUS_M = 1609; // ~1 mile around each ZCTA centroid
 const UA = "MyMik-POC/1.0 (neighborhood ingestion; contact: you@example.com)";
 // The Census ZCTA gazetteer ships as a .zip — download + unzip it to this path.
@@ -100,24 +107,37 @@ async function fetchOsmCounts(lat, lng, attempt = 0) {
 .amen out count;
 .night out count;
 .outd out count;`;
-  const res = await fetch(OVERPASS, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain", "User-Agent": UA },
-    body: q,
-  });
-  if (res.status === 429 || res.status === 504) {
-    if (attempt < 3) {
-      await sleep(5000 * (attempt + 1));
-      return fetchOsmCounts(lat, lng, attempt + 1);
+  // Try each mirror in turn; retry the whole rotation a few times with backoff.
+  const MAX_ROUNDS = 4;
+  for (let round = attempt; round < MAX_ROUNDS; round++) {
+    for (const endpoint of OVERPASS_ENDPOINTS) {
+      let res;
+      try {
+        res = await fetch(endpoint, {
+          method: "POST",
+          // Documented Overpass interface: form-encoded `data=` body. Some
+          // mirrors return 406 for a raw text/plain body.
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": UA,
+          },
+          body: "data=" + encodeURIComponent(q),
+        });
+      } catch {
+        continue; // network error — try the next mirror
+      }
+      if (res.ok) {
+        const counts = (await res.json()).elements
+          .filter((e) => e.type === "count")
+          .map((e) => Number(e.tags.total));
+        const [amenities, nightlife, outdoors] = counts;
+        return { amenities, nightlife, outdoors, total: amenities + nightlife + outdoors };
+      }
+      // 406/429/5xx/504: this mirror is busy or picky — fall through to the next.
     }
-    throw new Error(`Overpass ${res.status} after retries`);
+    await sleep(4000 * (round + 1)); // backoff before re-trying the rotation
   }
-  if (!res.ok) throw new Error(`Overpass ${res.status}`);
-  const counts = (await res.json()).elements
-    .filter((e) => e.type === "count")
-    .map((e) => Number(e.tags.total));
-  const [amenities, nightlife, outdoors] = counts;
-  return { amenities, nightlife, outdoors, total: amenities + nightlife + outdoors };
+  throw new Error("Overpass unavailable on all mirrors after retries");
 }
 
 // Min-max normalize a metric across the metro to 0-100 (null-safe).
