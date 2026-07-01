@@ -18,9 +18,13 @@ export type ZipDetection = {
   detected: { name: string; city: string };
   /** Engine-ready strings for resolveMatches; null ⇒ preview mode. */
   matchable: { city: string; neighborhood: string } | null;
-  source: "data" | "nominatim";
+  source: "data" | "nominatim" | "centroid";
 };
 
+export function pickPlaceName(
+  address: unknown,
+  opts?: { exclude?: string[] }
+): string | null;
 export const ZIP_RE: RegExp;
 export function isZipLike(s: unknown): boolean;
 export const US_STATE_ABBR: Record<string, string>;
@@ -41,8 +45,26 @@ export function pickNearestPlaceName(
   point: LatLng | null | undefined,
   opts?: { exclude?: string[] }
 ): string | null;
+export function pickNearestCityName(
+  elements: unknown,
+  point: LatLng | null | undefined
+): string | null;
 export function cityLabelFromAddress(address: unknown): string | null;
 export const MAX_MATCH_KM: number;
+export function matchableNear(
+  point: LatLng,
+  cityLabel: string | null,
+  neighborhoods: NeighborhoodLike[],
+  knownCities: Set<string>
+): { city: string; neighborhood: string } | null;
+export function shapeCentroidResult(
+  zip: string,
+  point: LatLng | null | undefined,
+  address: unknown,
+  placeElements: unknown,
+  neighborhoods: NeighborhoodLike[],
+  knownCities: Set<string>
+): ZipDetection | null;
 export function resolveZipLocally(
   zip: string,
   neighborhoods: NeighborhoodLike[]

@@ -1,30 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   label: string;
   value: string;
   onChange: (city: string) => void;
-  options: string[];
-  liveSet?: Set<string>;
   placeholder?: string;
 };
 
-const MAX_SUGGESTIONS = 8;
+type Suggestion = { city: string; live: boolean };
 
-export default function CityTypeahead({
-  label,
-  value,
-  onChange,
-  options,
-  liveSet,
-  placeholder,
-}: Props) {
+/**
+ * City type-ahead backed by /api/cities (the full ~32k Census Places list
+ * stays server-side — it used to ship ~150kB of JSON to every browser).
+ * Suggestions are debounced per keystroke; stale responses are discarded.
+ */
+export default function CityTypeahead({ label, value, onChange, placeholder }: Props) {
   const [query, setQuery] = useState(value);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const boxRef = useRef<HTMLDivElement>(null);
+  const seq = useRef(0);
 
   useEffect(() => setQuery(value), [value]);
 
@@ -39,24 +37,26 @@ export default function CityTypeahead({
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
-  const suggestions = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const isLive = (c: string) => (liveSet?.has(c) ? 1 : 0);
-    const pool = q
-      ? options.filter((c) => c.toLowerCase().includes(q))
-      : options;
-    // Rank: live first, then names that start with the query, then alphabetical.
-    return [...pool]
-      .sort((a, b) => {
-        const live = isLive(b) - isLive(a);
-        if (live) return live;
-        const sa = a.toLowerCase().startsWith(q) ? 1 : 0;
-        const sb = b.toLowerCase().startsWith(q) ? 1 : 0;
-        if (sb - sa) return sb - sa;
-        return a.localeCompare(b);
-      })
-      .slice(0, MAX_SUGGESTIONS);
-  }, [query, options, liveSet]);
+  // Debounced server-side search; ZIP-like input gets no city suggestions
+  // (the match page handles ZIP detection separately).
+  useEffect(() => {
+    const q = query.trim();
+    if (/^\d/.test(q)) {
+      setSuggestions([]);
+      return;
+    }
+    const mySeq = ++seq.current;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/cities?q=${encodeURIComponent(q)}`);
+        const data = (await res.json()) as { suggestions?: Suggestion[] };
+        if (mySeq === seq.current) setSuggestions(data.suggestions ?? []);
+      } catch {
+        if (mySeq === seq.current) setSuggestions([]);
+      }
+    }, 150);
+    return () => clearTimeout(t);
+  }, [query]);
 
   function choose(city: string) {
     onChange(city);
@@ -99,7 +99,7 @@ export default function CityTypeahead({
             } else if (e.key === "Enter") {
               if (suggestions[active]) {
                 e.preventDefault();
-                choose(suggestions[active]);
+                choose(suggestions[active].city);
               }
             } else if (e.key === "Escape") {
               setOpen(false);
@@ -110,30 +110,27 @@ export default function CityTypeahead({
 
       {open && suggestions.length > 0 && (
         <ul className="glass-strong absolute z-50 mt-1 max-h-64 w-full overflow-auto py-1 text-sm">
-          {suggestions.map((city, i) => {
-            const live = liveSet?.has(city);
-            return (
-              <li
-                key={city}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  choose(city);
-                }}
-                onMouseEnter={() => setActive(i)}
-                className={`flex cursor-pointer items-center justify-between px-3 py-2 ${
-                  i === active ? "bg-brand-purple/10" : ""
-                }`}
-              >
-                <span className="text-brand-text">{city}</span>
-                {live && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-green">
-                    <span className="h-1.5 w-1.5 rounded-full bg-brand-green" />
-                    live
-                  </span>
-                )}
-              </li>
-            );
-          })}
+          {suggestions.map((s, i) => (
+            <li
+              key={s.city}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                choose(s.city);
+              }}
+              onMouseEnter={() => setActive(i)}
+              className={`flex cursor-pointer items-center justify-between px-3 py-2 ${
+                i === active ? "bg-brand-purple/10" : ""
+              }`}
+            >
+              <span className="text-brand-text">{s.city}</span>
+              {s.live && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-green">
+                  <span className="h-1.5 w-1.5 rounded-full bg-brand-green" />
+                  live
+                </span>
+              )}
+            </li>
+          ))}
         </ul>
       )}
     </div>

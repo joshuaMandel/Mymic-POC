@@ -11,6 +11,9 @@
 
 import { pickPlaceName } from "./place-name.mjs";
 
+// Re-exported so API routes get one import surface for ZIP resolution.
+export { pickPlaceName };
+
 export const ZIP_RE = /^\d{5}$/;
 
 /** True when the trimmed input is exactly 5 digits. */
@@ -120,6 +123,30 @@ export function pickNearestPlaceName(elements, point, opts = {}) {
   return best ? best.name : null;
 }
 
+/**
+ * Nearest city/town label from Overpass `place` nodes — the fallback city name
+ * when no geocoder address is available. Towns/villages get a small distance
+ * penalty so a proper city wins unless the town is meaningfully closer.
+ * @returns {string|null}
+ */
+export function pickNearestCityName(elements, point) {
+  if (!Array.isArray(elements) || !point) return null;
+  const PENALTY_KM = { city: 0, town: 2, village: 4 };
+  let best = null;
+  for (const el of elements) {
+    const name = el?.tags?.name;
+    const place = el?.tags?.place;
+    const lat = Number(el?.lat);
+    const lng = Number(el?.lon);
+    if (typeof name !== "string" || !name.trim()) continue;
+    if (!(place in PENALTY_KM)) continue;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const score = haversineKm(point, { lat, lng }) + PENALTY_KM[place];
+    if (!best || score < best.score) best = { name: name.trim(), score };
+  }
+  return best ? best.name : null;
+}
+
 /** Nominatim address object → "City, ST" in the app's format, or null. */
 export function cityLabelFromAddress(address) {
   if (!address || typeof address !== "object") return null;
@@ -136,6 +163,23 @@ export function cityLabelFromAddress(address) {
  * (e.g. 63122 → "Kirkwood, MO" municipality → our St. Louis "Kirkwood").
  */
 export const MAX_MATCH_KM = 30;
+
+/**
+ * Engine-ready { city, neighborhood } for a point: nearest record within the
+ * resolved city if it's live, else the global-nearest within MAX_MATCH_KM.
+ * @returns {{city: string, neighborhood: string} | null}
+ */
+export function matchableNear(point, cityLabel, neighborhoods, knownCities) {
+  if (cityLabel && knownCities?.has?.(cityLabel)) {
+    const near = nearestNeighborhood(point, neighborhoods, cityLabel);
+    if (near) return { city: near.neighborhood.city, neighborhood: near.neighborhood.name };
+  }
+  const near = nearestNeighborhood(point, neighborhoods);
+  if (near && near.distanceKm <= MAX_MATCH_KM) {
+    return { city: near.neighborhood.city, neighborhood: near.neighborhood.name };
+  }
+  return null;
+}
 
 /**
  * Data path: resolve a ZIP entirely from ingested records (id "zcta-<zip>").
@@ -185,19 +229,7 @@ export function shapeNominatimResult(zip, searchJson, reverseJson, neighborhoods
     cityPart ??
     `ZIP ${zip}`;
 
-  // Matchable origin: nearest record within the resolved city if it's live;
-  // otherwise the global-nearest within MAX_MATCH_KM (suburb rescue).
-  let matchable = null;
-  if (cityLabel && knownCities?.has?.(cityLabel)) {
-    const near = nearestNeighborhood(point, neighborhoods, cityLabel);
-    if (near) matchable = { city: near.neighborhood.city, neighborhood: near.neighborhood.name };
-  }
-  if (!matchable) {
-    const near = nearestNeighborhood(point, neighborhoods);
-    if (near && near.distanceKm <= MAX_MATCH_KM) {
-      matchable = { city: near.neighborhood.city, neighborhood: near.neighborhood.name };
-    }
-  }
+  const matchable = matchableNear(point, cityLabel, neighborhoods, knownCities);
 
   return {
     zip,
@@ -205,4 +237,35 @@ export function shapeNominatimResult(zip, searchJson, reverseJson, neighborhoods
     matchable,
     source: "nominatim",
   };
+}
+
+/**
+ * Resolve a ZIP from a LOCAL centroid (data/zip-centroids.generated.json) —
+ * the resilient path: matching needs no external service at all, and the
+ * optional Nominatim address / Overpass place nodes only improve the label.
+ *
+ * @param {string} zip
+ * @param {{lat:number,lng:number}} point - the ZIP's gazetteer centroid
+ * @param {unknown} address - Nominatim reverse `address` object, or null
+ * @param {unknown} placeElements - Overpass place-node elements, or null
+ * @param {object[]} neighborhoods
+ * @param {Set<string>} knownCities
+ */
+export function shapeCentroidResult(zip, point, address, placeElements, neighborhoods, knownCities) {
+  if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return null;
+  const cityLabel = cityLabelFromAddress(address);
+  const cityPart = cityLabel ? cityLabel.split(",")[0].trim() : null;
+  const exclude = cityPart ? [cityPart] : [];
+  const matchable = matchableNear(point, cityLabel, neighborhoods, knownCities);
+  const name =
+    pickPlaceName(address && typeof address === "object" ? address : null, { exclude }) ??
+    pickNearestPlaceName(placeElements, point, { exclude }) ??
+    matchable?.neighborhood ??
+    `ZIP ${zip}`;
+  const city =
+    cityLabel ??
+    matchable?.city ??
+    pickNearestCityName(placeElements, point) ??
+    `ZIP ${zip}`;
+  return { zip, detected: { name, city }, matchable, source: "centroid" };
 }
