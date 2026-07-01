@@ -74,5 +74,6 @@ export async function POST(req: Request) {
     zoom: result.zoom,
     matches,
     aiGenerated,
+    supported: result.supported,
   });
 }

@@ -41,9 +41,16 @@ the engine:
 - labels each with its closest **familiar** equivalent from your origin city
   (nearest attribute vector).
 
-**Any city in the dataset can be an origin *or* a destination** — the `/match`
-pickers list them all. Seeded cities: St. Louis, Chicago, San Francisco, Denver,
-Austin, Seattle (5 neighborhoods each, both directions).
+**Any city in the dataset can be an origin *or* a destination.** The `/match`
+city fields are a **type-ahead over US cities** (`components/CityTypeahead.tsx`,
+list in `lib/us-cities.ts`) — cities with real neighborhood data are marked
+**● live**; picking a not-yet-ingested city shows a labeled "Preview" result set
+rather than breaking. Seeded live cities: St. Louis, Chicago, San Francisco,
+Denver, Austin, Seattle (5 neighborhoods each, both directions).
+
+To populate the type-ahead with **every** US city, run
+`scripts/build-us-cities.mjs` against the free Census "Places" gazetteer (~19k
+entries) and merge its output into `lib/us-cities.ts` (see the file header).
 
 ### Scaling to real US cities
 
