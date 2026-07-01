@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - run: npm ci
 
@@ -53,7 +53,20 @@ jobs:
           git add -f data/us-cities.generated.json data/neighborhoods.generated.json
           if git diff --staged --quiet; then
             echo "No data changes."
-          else
-            git commit -m "chore(data): ingest neighborhood + city data [skip ci]"
-            git push
+            exit 0
           fi
+          git commit -m "chore(data): ingest neighborhood + city data [skip ci]"
+          # main may have advanced while ingestion ran (it takes minutes), so
+          # rebase onto the latest before pushing and retry on a lost race.
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "Push attempt $attempt failed (main moved); retrying…"
+            sleep $((attempt * 5))
+          done
+          echo "::error::Could not push ingested data after 5 attempts."
+          exit 1
