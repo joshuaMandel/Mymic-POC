@@ -29,5 +29,7 @@ next-env.d.ts
 # visual QA output
 /screenshots
 
-# generated datasets
-/data
+# generated datasets — ignore large intermediates, keep committed outputs
+/data/*
+!/data/us-cities.generated.json
+!/data/neighborhoods.generated.json

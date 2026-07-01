@@ -55,14 +55,26 @@ entries) and merge its output into `lib/us-cities.ts` (see the file header).
 ### Scaling to real US cities
 
 `scripts/build-neighborhoods.mjs` ingests real **US Census (ACS)** data into the
-same `Neighborhood` schema so the engine can cover real cities nationwide:
+same `Neighborhood` schema so the engine can cover real cities nationwide. The app
+auto-merges `data/neighborhoods.generated.json` and `data/us-cities.generated.json`
+on the next deploy, so you never edit `lib/` by hand.
+
+**Recommended — run it on GitHub (no local setup):** a workflow
+(`.github/workflows/ingest-data.yml`) runs the whole ingestion on GitHub's servers and
+commits the generated data back to the repo, which triggers a fresh Vercel deploy.
+
+1. Get a free Census key: <https://api.census.gov/data/key_signup.html> (instant, emailed).
+2. Add it as a repo secret: **Settings → Secrets and variables → Actions → New
+   repository secret** → name `CENSUS_API_KEY`, paste the key.
+3. Edit `scripts/metros.json` with the metros + ZIPs you want to add.
+4. Run it: **Actions tab → "Ingest neighborhood data" → Run workflow**.
+
+**Alternative — run it locally** (Node 18+, needs network):
 
 ```bash
-# 1. free Census key: https://api.census.gov/data/key_signup.html
-export CENSUS_API_KEY=xxxx
-# 2. edit scripts/metros.json with the metros + ZIPs you want
-# 3. run it (Node 18+, needs network)
-node scripts/build-neighborhoods.mjs   # → data/neighborhoods.generated.json
+export CENSUS_API_KEY=xxxx                # same free key as above
+node scripts/build-us-cities.mjs          # → data/us-cities.generated.json
+node scripts/build-neighborhoods.mjs      # → data/neighborhoods.generated.json
 ```
 
 All sources are **free**. Real signals per ZIP:
@@ -75,8 +87,9 @@ All sources are **free**. Real signals per ZIP:
 
 Each metric is normalized within its metro, then written in the `Neighborhood` shape.
 Remaining `TODO`s (EPA walkability, real school ratings, a neighborhood-name gazetteer)
-are marked in the script. Merge the generated JSON into `lib/neighborhoods.ts` to use it.
-Overpass is rate-limited, so the script is paced — run a handful of metros at a time.
+are marked in the script. The generated JSON is merged automatically by
+`lib/neighborhoods.ts` — seed cities keep their curated names, ingested cities only get
+*added*. Overpass is rate-limited, so the script is paced — run a handful of metros at a time.
 
 ## Backend API
 

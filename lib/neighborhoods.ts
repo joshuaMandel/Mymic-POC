@@ -1,3 +1,5 @@
+import generatedRaw from "../data/neighborhoods.generated.json";
+
 // The comparable attributes every neighborhood is scored on (0-100, normalized
 // within its metro). This is the vector the similarity engine matches against.
 export const FACTORS = [
@@ -46,7 +48,7 @@ const a = (
  * any city here can be matched against any other. The ingestion script
  * (scripts/build-neighborhoods.mjs) extends this to real US cities.
  */
-export const neighborhoods: Neighborhood[] = [
+const SEED: Neighborhood[] = [
   // --- St. Louis, MO ---
   { id: "stl-kirkwood", city: "St. Louis, MO", name: "Kirkwood", coords: { lat: 38.5834, lng: -90.4068 }, attrs: a(72, 70, 90, 45, 82) },
   { id: "stl-clayton", city: "St. Louis, MO", name: "Clayton", coords: { lat: 38.6426, lng: -90.3237 }, attrs: a(82, 92, 85, 60, 62) },
@@ -90,6 +92,16 @@ export const neighborhoods: Neighborhood[] = [
   { id: "sea-slu", city: "Seattle, WA", name: "South Lake Union", coords: { lat: 47.627, lng: -122.337 }, attrs: a(84, 80, 50, 70, 54) },
 ];
 
+// Ingested cities from data/neighborhoods.generated.json (written by the
+// ingestion GitHub Action). Seed cities keep their curated named neighborhoods;
+// ingested data only ADDS cities not already in the seed.
+const GENERATED = generatedRaw as Neighborhood[];
+const seedCities = new Set(SEED.map((n) => n.city));
+export const neighborhoods: Neighborhood[] = [
+  ...SEED,
+  ...GENERATED.filter((n) => !seedCities.has(n.city)),
+];
+
 // Distinct city names, in insertion order.
 export const cityNames: string[] = Array.from(
   new Set(neighborhoods.map((n) => n.city))
@@ -100,7 +112,15 @@ export function neighborhoodsInCity(city: string): Neighborhood[] {
 }
 
 export function cityMeta(city: string): CityMeta {
-  return CITY_META[city] ?? { center: { lat: 39.5, lng: -98.35 }, zoom: 11 };
+  if (CITY_META[city]) return CITY_META[city];
+  // Ingested cities: center on the average of their neighborhood coordinates.
+  const inCity = neighborhoodsInCity(city);
+  if (inCity.length > 0) {
+    const lat = inCity.reduce((s, n) => s + n.coords.lat, 0) / inCity.length;
+    const lng = inCity.reduce((s, n) => s + n.coords.lng, 0) / inCity.length;
+    return { center: { lat, lng }, zoom: 12 };
+  }
+  return { center: { lat: 39.5, lng: -98.35 }, zoom: 4 };
 }
 
 // Back-compat names used by the pickers (any city can now be origin or destination).

@@ -1,4 +1,5 @@
 import { cityNames } from "./neighborhoods";
+import generatedCities from "../data/us-cities.generated.json";
 
 // Cities we currently have real neighborhood data for (the "● live" ones).
 export const LIVE_CITIES = new Set(cityNames);
@@ -59,7 +60,8 @@ const SEED: string[] = [
   "Burlington, VT", "Portland, ME", "Manchester, NH", "Fargo, ND", "Cheyenne, WY",
 ];
 
-// Live-data cities always present; de-duped and alpha-sorted.
+// Live-data cities + seed + the full generated list (data/us-cities.generated.json,
+// written by the ingestion Action); de-duped and alpha-sorted.
 export const usCities: string[] = Array.from(
-  new Set([...cityNames, ...SEED])
+  new Set([...cityNames, ...SEED, ...(generatedCities as string[])])
 ).sort((a, b) => a.localeCompare(b));

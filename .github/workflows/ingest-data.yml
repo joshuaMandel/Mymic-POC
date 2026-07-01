@@ -1,0 +1,59 @@
+name: Ingest neighborhood data
+
+# Runs the ingestion on GitHub's servers (open internet), then commits the
+# generated data back so the app picks it up on the next deploy.
+# Trigger it manually from the Actions tab → "Ingest neighborhood data" → Run workflow.
+# Requires a repo secret CENSUS_API_KEY (free: https://api.census.gov/data/key_signup.html).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - name: Download Census gazetteers
+        run: |
+          set -e
+          mkdir -p data
+          for Y in 2024 2023 2022; do
+            if curl -fsSL -o place.zip "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/${Y}_Gazetteer/${Y}_Gaz_place_national.zip"; then break; fi
+          done
+          for Y in 2023 2022 2021; do
+            if curl -fsSL -o zcta.zip "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/${Y}_Gazetteer/${Y}_Gaz_zcta_national.zip"; then break; fi
+          done
+          unzip -o place.zip -d data
+          unzip -o zcta.zip -d data
+          mv data/*_Gaz_place_national.txt data/gaz_place.txt
+          mv data/*_Gaz_zcta_national.txt data/gaz_zcta.txt
+
+      - name: Build full US city list
+        run: node scripts/build-us-cities.mjs
+
+      - name: Build neighborhood data (Census + OpenStreetMap)
+        env:
+          CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
+        run: node scripts/build-neighborhoods.mjs
+
+      - name: Commit generated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f data/us-cities.generated.json data/neighborhoods.generated.json
+          if git diff --staged --quiet; then
+            echo "No data changes."
+          else
+            git commit -m "chore(data): ingest neighborhood + city data [skip ci]"
+            git push
+          fi
